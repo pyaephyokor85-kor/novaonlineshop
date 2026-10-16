@@ -3,6 +3,7 @@
   "outputDirectory": "dist",
   "rewrites": [
     { "source": "/api/scent-advisor", "destination": "/api/scent-advisor" },
+    { "source": "/api/order-notification", "destination": "/api/order-notification" },
     { "source": "/(.*)", "destination": "/index.html" }
   ],
   "headers": [
