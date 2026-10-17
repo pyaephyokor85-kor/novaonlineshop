@@ -23,7 +23,7 @@ export const novaCatalog = [
     "color": "#E8C8A6",
     "accent": "#6B5143",
     "tag": "Men",
-    "image": "./assets/products/NV-001.jpg"
+    "image": "./NV-001.jpg"
   },
   {
     "id": "NV-002",
@@ -49,7 +49,7 @@ export const novaCatalog = [
     "color": "#E8B7C2",
     "accent": "#6B5143",
     "tag": "Women",
-    "image": "./assets/products/NV-002.jpg"
+    "image": "./NV-002.jpg"
   },
   {
     "id": "NV-003",
@@ -79,7 +79,7 @@ export const novaCatalog = [
     "color": "#E5D28B",
     "accent": "#6B5143",
     "tag": "Men",
-    "image": "./assets/products/NV-003.jpg"
+    "image": "./NV-003.jpg"
   },
   {
     "id": "NV-004",
@@ -105,7 +105,7 @@ export const novaCatalog = [
     "color": "#B69C8F",
     "accent": "#6B5143",
     "tag": "Women",
-    "image": "./assets/products/NV-004.jpg"
+    "image": "./NV-004.jpg"
   },
   {
     "id": "NV-005",
@@ -131,7 +131,7 @@ export const novaCatalog = [
     "color": "#C9D7C0",
     "accent": "#6B5143",
     "tag": "Men",
-    "image": "./assets/products/NV-005.jpg"
+    "image": "./NV-005.jpg"
   },
   {
     "id": "NV-006",
@@ -157,7 +157,7 @@ export const novaCatalog = [
     "color": "#D9B89C",
     "accent": "#6B5143",
     "tag": "Men",
-    "image": "./assets/products/NV-006.jpg"
+    "image": "./NV-006.jpg"
   },
   {
     "id": "NV-007",
@@ -183,7 +183,7 @@ export const novaCatalog = [
     "color": "#D7A6A6",
     "accent": "#6B5143",
     "tag": "Men",
-    "image": "./assets/products/NV-007.jpg"
+    "image": "./NV-007.jpg"
   },
   {
     "id": "NV-008",
@@ -209,7 +209,7 @@ export const novaCatalog = [
     "color": "#B8C8D8",
     "accent": "#6B5143",
     "tag": "Men",
-    "image": "./assets/products/NV-008.jpg"
+    "image": "./NV-008.jpg"
   },
   {
     "id": "NV-009",
@@ -233,7 +233,7 @@ export const novaCatalog = [
     "color": "#E8C8A6",
     "accent": "#6B5143",
     "tag": "Women",
-    "image": "./assets/products/NV-009.jpg"
+    "image": "./NV-009.jpg"
   },
   {
     "id": "NV-010",
@@ -259,7 +259,7 @@ export const novaCatalog = [
     "color": "#E8B7C2",
     "accent": "#6B5143",
     "tag": "Men",
-    "image": "./assets/products/NV-010.jpg"
+    "image": "./NV-010.jpg"
   },
   {
     "id": "NV-011",
@@ -285,7 +285,7 @@ export const novaCatalog = [
     "color": "#E5D28B",
     "accent": "#6B5143",
     "tag": "Women",
-    "image": "./assets/products/NV-011.jpg"
+    "image": "./NV-011.jpg"
   },
   {
     "id": "NV-012",
@@ -311,7 +311,7 @@ export const novaCatalog = [
     "color": "#B69C8F",
     "accent": "#6B5143",
     "tag": "Women",
-    "image": "./assets/products/NV-012.jpg"
+    "image": "./NV-012.jpg"
   },
   {
     "id": "NV-013",
@@ -337,7 +337,7 @@ export const novaCatalog = [
     "color": "#C9D7C0",
     "accent": "#6B5143",
     "tag": "Women",
-    "image": "./assets/products/NV-013.jpg"
+    "image": "./NV-013.jpg"
   },
   {
     "id": "NV-014",
@@ -363,7 +363,7 @@ export const novaCatalog = [
     "color": "#D9B89C",
     "accent": "#6B5143",
     "tag": "Women",
-    "image": "./assets/products/NV-014.jpg"
+    "image": "./NV-014.jpg"
   },
   {
     "id": "NV-015",
@@ -389,7 +389,7 @@ export const novaCatalog = [
     "color": "#D7A6A6",
     "accent": "#6B5143",
     "tag": "Men",
-    "image": "./assets/products/NV-015.jpg"
+    "image": "./NV-015.jpg"
   },
   {
     "id": "NV-016",
@@ -415,7 +415,7 @@ export const novaCatalog = [
     "color": "#B8C8D8",
     "accent": "#6B5143",
     "tag": "Unisex",
-    "image": "./assets/products/NV-016.jpg"
+    "image": "./NV-016.jpg"
   },
   {
     "id": "NV-017",
@@ -439,7 +439,7 @@ export const novaCatalog = [
     "color": "#E8C8A6",
     "accent": "#6B5143",
     "tag": "Men",
-    "image": "./assets/products/NV-017.jpg"
+    "image": "./NV-017.jpg"
   },
   {
     "id": "NV-018",
@@ -465,7 +465,7 @@ export const novaCatalog = [
     "color": "#E8B7C2",
     "accent": "#6B5143",
     "tag": "Men",
-    "image": "./assets/products/NV-018.jpg"
+    "image": "./NV-018.jpg"
   },
   {
     "id": "NV-019",
@@ -491,7 +491,7 @@ export const novaCatalog = [
     "color": "#E5D28B",
     "accent": "#6B5143",
     "tag": "Men",
-    "image": "./assets/products/NV-019.jpg"
+    "image": "./NV-019.jpg"
   },
   {
     "id": "NV-020",
@@ -517,7 +517,7 @@ export const novaCatalog = [
     "color": "#B69C8F",
     "accent": "#6B5143",
     "tag": "Men",
-    "image": "./assets/products/NV-020.jpg"
+    "image": "./NV-020.jpg"
   },
   {
     "id": "NV-021",
@@ -543,7 +543,7 @@ export const novaCatalog = [
     "color": "#C9D7C0",
     "accent": "#6B5143",
     "tag": "Unisex",
-    "image": "./assets/products/NV-021.jpg"
+    "image": "./NV-021.jpg"
   },
   {
     "id": "NV-022",
@@ -569,7 +569,7 @@ export const novaCatalog = [
     "color": "#D9B89C",
     "accent": "#6B5143",
     "tag": "Men",
-    "image": "./assets/products/NV-022.jpg"
+    "image": "./NV-022.jpg"
   },
   {
     "id": "NV-023",
@@ -595,7 +595,7 @@ export const novaCatalog = [
     "color": "#D7A6A6",
     "accent": "#6B5143",
     "tag": "Women",
-    "image": "./assets/products/NV-023.jpg"
+    "image": "./NV-023.jpg"
   },
   {
     "id": "NV-024",
@@ -619,7 +619,7 @@ export const novaCatalog = [
     "color": "#B8C8D8",
     "accent": "#6B5143",
     "tag": "Women",
-    "image": "./assets/products/NV-024.jpg"
+    "image": "./NV-024.jpg"
   },
   {
     "id": "NV-025",
@@ -645,7 +645,7 @@ export const novaCatalog = [
     "color": "#E8C8A6",
     "accent": "#6B5143",
     "tag": "Women",
-    "image": "./assets/products/NV-025.jpg"
+    "image": "./NV-025.jpg"
   },
   {
     "id": "NV-026",
@@ -671,7 +671,7 @@ export const novaCatalog = [
     "color": "#E8B7C2",
     "accent": "#6B5143",
     "tag": "Men",
-    "image": "./assets/products/NV-026.jpg"
+    "image": "./NV-026.jpg"
   },
   {
     "id": "NV-027",
@@ -695,7 +695,7 @@ export const novaCatalog = [
     "color": "#E5D28B",
     "accent": "#6B5143",
     "tag": "Men",
-    "image": "./assets/products/NV-027.jpg"
+    "image": "./NV-027.jpg"
   },
   {
     "id": "NV-028",
@@ -721,7 +721,7 @@ export const novaCatalog = [
     "color": "#B69C8F",
     "accent": "#6B5143",
     "tag": "Women",
-    "image": "./assets/products/NV-028.jpg"
+    "image": "./NV-028.jpg"
   },
   {
     "id": "NV-029",
@@ -747,7 +747,7 @@ export const novaCatalog = [
     "color": "#C9D7C0",
     "accent": "#6B5143",
     "tag": "Unisex",
-    "image": "./assets/products/NV-029.jpg"
+    "image": "./NV-029.jpg"
   },
   {
     "id": "NV-030",
@@ -773,7 +773,7 @@ export const novaCatalog = [
     "color": "#D9B89C",
     "accent": "#6B5143",
     "tag": "Unisex",
-    "image": "./assets/products/NV-030.jpg"
+    "image": "./NV-030.jpg"
   },
   {
     "id": "NV-031",
@@ -799,7 +799,7 @@ export const novaCatalog = [
     "color": "#D7A6A6",
     "accent": "#6B5143",
     "tag": "Women",
-    "image": "./assets/products/NV-031.jpg"
+    "image": ".NV-031.jpg"
   },
   {
     "id": "NV-032",
@@ -825,6 +825,6 @@ export const novaCatalog = [
     "color": "#B8C8D8",
     "accent": "#6B5143",
     "tag": "Men",
-    "image": "./assets/products/NV-032.jpg"
+    "image": "./NV-032.jpg"
   }
 ] as const;
