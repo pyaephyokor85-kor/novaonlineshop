@@ -25,6 +25,7 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "build:web": "expo export --platform web",
+    "vercel-build": "expo export --platform web",
     "api": "node --env-file=.env server.mjs"
   },
   "private": true
