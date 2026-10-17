@@ -1,12 +1,20 @@
 {
-  "buildCommand": "npm run build:web",
-  "outputDirectory": "dist",
-  "rewrites": [
-    { "source": "/api/scent-advisor", "destination": "/api/scent-advisor" },
-    { "source": "/api/order-notification", "destination": "/api/order-notification" },
-    { "source": "/(.*)", "destination": "/index.html" }
+  "builds": [
+    {
+      "src": "api/*.mjs",
+      "use": "@vercel/node"
+    },
+    {
+      "src": "package.json",
+      "use": "@vercel/static-build",
+      "config": {
+        "distDir": "dist",
+        "buildCommand": "npm run build:web"
+      }
+    }
   ],
-  "headers": [
-    { "source": "/assets/(.*)", "headers": [{ "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }] }
+  "routes": [
+    { "src": "/api/(.*)", "dest": "/api/$1" },
+    { "src": "/(.*)", "dest": "/index.html" }
   ]
 }
