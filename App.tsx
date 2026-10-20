@@ -124,12 +124,88 @@ function ProfileMemory({ profile }: { profile: FragranceProfile }) {
 function RecommendationStrip({ items }: { items: Recommendation[] }) {
   return <View className="mt-1"><Text className="mb-2 text-[10px] font-bold tracking-[1.5px] text-nova-clay">CURATED FOR YOUR PROFILE</Text><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerClassName="gap-2 pb-1">{items.filter(item => !item.blocked).slice(0, 3).map(item => <View key={item.id} className="w-40 rounded-2xl border border-[#E8DED1] bg-[#FFFDF9] p-3"><Text className="text-[12px] font-bold text-nova-ink">{item.name}</Text><Text className="mt-1 text-[10px] text-nova-clay">{item.family.join(' · ')}</Text><Text className="mt-2 text-[10px] leading-4 text-nova-muted">{item.matchedNotes.length ? `Matches ${item.matchedNotes.join(', ')}` : 'A balanced NOVA signature'}</Text>{item.seasonalMatches.length ? <Text className="mt-1 text-[10px] leading-4 text-[#A8754B]">Seasonal: {item.seasonalMatches.slice(0, 2).join(', ')}</Text> : null}{item.purchaseMatches > 0 ? <Text className="mt-1 text-[10px] leading-4 text-[#6D8B6F]">Based on your purchase history</Text> : null}<Text className="mt-2 text-[11px] font-bold text-nova-ink">{item.price}</Text></View>)}</ScrollView></View>;
 }
+// Validate only the response fields used by the client; never display raw error bodies.
+const isRecord = (value: unknown): value is Record<string, unknown> => Boolean(value && typeof value === 'object' && !Array.isArray(value));
+const isStringArray = (value: unknown): value is string[] => Array.isArray(value) && value.every(item => typeof item === 'string');
+const isAdvisorProfile = (value: unknown): value is FragranceProfile => isRecord(value)
+  && ['favoriteFamilies', 'preferredNotes', 'moods', 'occasions', 'dislikes'].every(key => isStringArray(value[key]))
+  && ['lastRecommendation', 'updatedAt'].every(key => value[key] === undefined || typeof value[key] === 'string');
+const isAdvisorRecommendation = (value: unknown): value is Recommendation => isRecord(value)
+  && ['id', 'name', 'price'].every(key => typeof value[key] === 'string')
+  && ['family', 'notes', 'matchedFamilies', 'matchedNotes', 'seasonalMatches'].every(key => isStringArray(value[key]))
+  && typeof value.score === 'number' && typeof value.purchaseMatches === 'number' && typeof value.blocked === 'boolean';
+const isAdvisorResponse = (value: unknown): value is { reply: string; profile?: FragranceProfile | null; recommendations?: Recommendation[] | null } => isRecord(value)
+  && typeof value.reply === 'string' && Boolean(value.reply.trim())
+  && (value.profile == null || isAdvisorProfile(value.profile))
+  && (value.recommendations == null || (Array.isArray(value.recommendations) && value.recommendations.every(isAdvisorRecommendation)));
+
 function Advisor() {
   const [input, setInput] = useState(''); const [loading, setLoading] = useState(false); const [profile, setProfile] = useState<FragranceProfile>(emptyProfile); const [profileId, setProfileId] = useState(''); const [purchaseHistory, setPurchaseHistory] = useState<PurchaseHistory[]>([]);
   const [messages, setMessages] = useState<Message[]>([{ id: '1', from: 'nova', text: 'မင်္ဂလာပါ။ NOVA Scent Adviser ပါ။ သင်နှစ်သက်တဲ့ ရနံ့၊ သုံးမယ့်အချိန်နဲ့ စိတ်ခံစားချက်ကို ပြောပြပါ။ သင့်အတွက် လိုက်ဖက်တဲ့ ရေမွှေးကို အတူရွေးကြမယ်။' }, { id: '2', from: 'nova', text: 'ဥပမာ — လန်းဆန်းတဲ့ ရနံ့လိုချင်တယ်၊ ရုံးတက်ဖို့ ရွေးပေးပါ၊ ဒါမှမဟုတ် ပန်းရနံ့ ကြိုက်တယ်လို့ မေးနိုင်ပါတယ်။' }]);
   useEffect(() => { getProfileId().then(async id => { setProfileId(id); try { if (isCloudUser(id)) { const cloud = await loadCloudProfile(id); setProfile(cloud || emptyProfile); } else { setProfile(await loadGuestProfile(id)); } } catch {} }); }, []);
   useEffect(() => { if (isCloudUser(profileId)) loadCloudPurchases().then(setPurchaseHistory).catch(() => {}); }, [profileId]);
-  const send = async () => { const text = input.trim(); if (!text || loading || !profileId) return; const next = [...messages, { id: `${Date.now()}u`, from: 'user' as const, text }]; setMessages(next); setInput(''); setLoading(true); try { const res = await fetch(apiEndpoint('/api/scent-advisor'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ profileId, message: text, profile, purchaseHistory, history: messages.slice(-10) }) }); const data = await res.json(); if (!res.ok) throw new Error(data.error || 'Advisor unavailable'); const nextProfile = data.profile || profile; setProfile(nextProfile); if (isCloudUser(profileId)) { try { await saveCloudProfile(profileId, nextProfile); } catch { /* Do not discard a valid advisor reply on cloud sync failure. */ } } else await AsyncStorage.setItem(guestProfileKey(profileId), JSON.stringify(nextProfile)); setMessages(current => [...current, { id: `${Date.now()}n`, from: 'nova', text: data.reply, recommendations: data.recommendations || [] }]); } catch { setMessages(current => [...current, { id: `${Date.now()}e`, from: 'nova', text: 'I’m having trouble reaching my scent studio. Please check the API server and try again.' }]); } finally { setLoading(false); } };
+  const send = async () => {
+    const text = input.trim();
+    if (!text || loading || !profileId) return;
+    const next = [...messages, { id: `${Date.now()}u`, from: 'user' as const, text }];
+    setMessages(next);
+    setInput('');
+    setLoading(true);
+    const showNotice = (notice: string) => setMessages(current => [...current, { id: `${Date.now()}e`, from: 'nova', text: notice }]);
+    try {
+      let endpoint: string;
+      try { endpoint = apiEndpoint('/api/scent-advisor'); }
+      catch {
+        showNotice('ရနံ့အကြံပေး API လိပ်စာ မသတ်မှတ်ရသေးပါ။ [API_CONFIG]');
+        return;
+      }
+      let res: Response;
+      try {
+        res = await fetch(endpoint, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ profileId, message: text, profile, purchaseHistory, history: messages.slice(-10) }),
+        });
+      } catch {
+        showNotice('ရနံ့အကြံပေးနှင့် ချိတ်ဆက်မရပါ။ အင်တာနက်ချိတ်ဆက်မှုကို စစ်ပြီး ပြန်ကြိုးစားပါ။ [NETWORK]');
+        return;
+      }
+      // HTTP status takes precedence even when a proxy returns HTML instead of JSON.
+      if (!res.ok) {
+        showNotice(`ရနံ့အကြံပေး ဆာဗာမှ တောင်းဆိုမှု မအောင်မြင်ပါ။ ခဏနေ ပြန်ကြိုးစားပါ။ [HTTP ${res.status}]`);
+        return;
+      }
+      let body: string;
+      try { body = await res.text(); }
+      catch {
+        showNotice('ရနံ့အကြံပေး၏ အဖြေကို လက်ခံစဉ် ချိတ်ဆက်မှု ပြတ်တောက်သွားပါသည်။ ပြန်ကြိုးစားပါ။ [NETWORK]');
+        return;
+      }
+      let data: unknown;
+      try { data = JSON.parse(body); }
+      catch {
+        showNotice('ရနံ့အကြံပေး ဆာဗာ၏ အဖြေသည် JSON ပုံစံ မမှန်ပါ။ ခဏနေ ပြန်ကြိုးစားပါ။ [INVALID_JSON]');
+        return;
+      }
+      if (!isAdvisorResponse(data)) {
+        showNotice('ရနံ့အကြံပေး ဆာဗာ၏ အဖြေပုံစံ မမှန်ပါ။ ခဏနေ ပြန်ကြိုးစားပါ။ [INVALID_RESPONSE]');
+        return;
+      }
+      const nextProfile = data.profile || profile;
+      const { reply, recommendations } = data;
+      // Show a valid reply and retain this session's profile before attempting persistence.
+      setProfile(nextProfile);
+      setMessages(current => [...current, { id: `${Date.now()}n`, from: 'nova', text: reply, recommendations: recommendations || [] }]);
+      if (isCloudUser(profileId)) {
+        try { await saveCloudProfile(profileId, nextProfile); }
+        catch { /* Do not discard a valid advisor reply on cloud sync failure. */ }
+      } else {
+        try { await AsyncStorage.setItem(guestProfileKey(profileId), JSON.stringify(nextProfile)); }
+        catch {
+          showNotice('အဖြေရရှိပါပြီ။ သို့သော် ရနံ့နှစ်သက်မှုကို ဤစက်တွင် မသိမ်းနိုင်ပါ။ နောက်တစ်ကြိမ် ဖွင့်လျှင် မမှတ်မိနိုင်ပါ။ [LOCAL_PROFILE_SAVE]');
+        }
+      }
+    } finally { setLoading(false); }
+  };
   return <SafeAreaView style={s.advisor}><View style={s.advisorHead}><View><Text style={s.eyebrow}>NOVA INTELLIGENCE</Text><Text style={s.heading}>Scent Adviser</Text></View><Text style={s.online}>{loading ? 'THINKING…' : 'NOVA AI'}</Text></View><ScrollView contentContainerStyle={s.chat}><ProfileMemory profile={profile} />{messages.map(m => <View key={m.id} style={[s.bubble, m.from === 'user' && s.userBubble]}><Text style={[s.bubbleText, m.from === 'user' && s.userText]}>{m.text}</Text>{m.recommendations?.length ? <RecommendationStrip items={m.recommendations} /> : null}</View>)}{loading && <View style={s.bubble}><Text style={s.bubbleText}>Learning your preferences…</Text></View>}</ScrollView><View style={s.composer}><TextInput value={input} onChangeText={setInput} accessibilityLabel="Message NOVA Scent Adviser" placeholder="ရနံ့အကြောင်း မေးလိုက်ပါ…" placeholderTextColor="#9C968D" style={s.input} onSubmitEditing={send} returnKeyType="send" editable={!loading}/><Pressable accessibilityRole="button" accessibilityLabel="Send message" disabled={loading || !input.trim() || !profileId} onPress={send} style={s.send}><Text style={s.sendText}>↑</Text></Pressable></View></SafeAreaView>;
 }
 function Profile({ onSignOut }: { onSignOut: () => void }) {
