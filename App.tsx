@@ -2,7 +2,8 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect, useRef, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createClient } from '@supabase/supabase-js';
-import { Image, Platform, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Image, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import './global.css';
 import { novaCatalog } from './data/nova-catalog';
 
@@ -81,15 +82,35 @@ function Bottle({ p, small = false }: { p: Product; small?: boolean }) {
   return <View style={[s.bottleWrap, small && s.bottleWrapSmall]}><View style={[s.cap, { backgroundColor: p.accent }, small && s.capSmall]} /><View style={[s.bottle, { backgroundColor: p.color }, small && s.bottleSmall]}><View style={s.shine} /><Text style={[s.bottleMark, small && s.bottleMarkSmall]}>N</Text>{!small && <Text style={s.bottleWord}>NOVA</Text>}</View></View>;
 }
 function Card({ p, onPress }: { p: Product; onPress: () => void }) {
-  return <Pressable onPress={onPress} style={({ pressed }) => [s.card, pressed && s.pressed]}><View style={s.productImage}>{p.tag && <Text style={s.cardTag}>{p.tag}</Text>}<Bottle p={p} small /><Text style={s.heart}>♡</Text></View><View style={s.cardBody}><View style={s.row}><Text style={s.productName}>{p.name}</Text><Text style={s.price}>{p.price}</Text></View><Text style={s.family}>{p.family}</Text><Text style={s.notes}>{p.notes}</Text></View></Pressable>;
+  const { width, fontScale } = useWindowDimensions();
+  const narrow = width < 360 || fontScale > 1.2;
+  const cardWidth = narrow ? '100%' : Math.max(142, (Math.min(width, 760) - 60) / 2);
+  return <Pressable onPress={onPress} style={({ pressed }) => [s.card, { width: cardWidth }, pressed && s.pressed]}><View style={s.productImage}>{p.tag && <Text style={s.cardTag}>{p.tag}</Text>}<Bottle p={p} small /><Text style={s.heart}>♡</Text></View><View style={s.cardBody}><View style={s.productRow}><Text style={s.productName}>{p.name}</Text><Text style={s.price}>{p.price}</Text></View><Text style={s.family}>{p.family}</Text><Text style={s.notes}>{p.notes}</Text></View></Pressable>;
 }
+// Change this copy when the shop has a new announcement. No unverified offers are shown.
+const HOME_NOTICE = 'NOVA မှ ကြိုဆိုပါတယ် · သင့်အတွက် ရနံ့ကို အတူရွေးချယ်မယ်';
 function Home({ go, pick }: { go: (t: Tab) => void; pick: (p: Product) => void }) {
-  return <ScrollView contentContainerStyle={s.page} showsVerticalScrollIndicator={false}><View style={s.top}><View><Text style={s.eyebrow}>GOOD EVENING</Text><Text style={s.heading}>Find your aura.</Text></View><View style={s.avatar}><Text style={s.avatarText}>N</Text></View></View><Pressable onPress={() => go('advisor')} style={({ pressed }) => [s.hero, pressed && s.pressed]}><View style={s.heroGlow} /><Text style={s.aiKicker}>NOVA INTELLIGENCE</Text><Text style={s.heroTitle}>Your signature scent{`\n`}is closer than you think.</Text><Text style={s.heroCopy}>Tell me how you want to feel. I'll curate the rest.</Text><View style={s.heroButton}><Text style={s.heroButtonText}>Talk to your scent advisor  →</Text></View></Pressable><View style={s.sectionHead}><View><Text style={s.sectionTitle}>Curated for you</Text><Text style={s.sectionSub}>Based on your mood and style</Text></View><Pressable onPress={() => go('discover')}><Text style={s.seeAll}>See all</Text></Pressable></View><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.rowList}>{products.slice(0, 3).map(p => <Card key={p.id} p={p} onPress={() => pick(p)} />)}</ScrollView><View style={s.editCard}><View style={{ flex: 1 }}><Text style={s.eyebrow}>THE NOVA EDIT</Text><Text style={s.editTitle}>Layering, made personal.</Text><Text style={s.editCopy}>Build a scent that is unmistakably yours with our intelligent layering guide.</Text><Pressable onPress={() => go('advisor')}><Text style={s.link}>Explore the edit  →</Text></Pressable></View><View style={s.orb}><Text style={s.orbText}>✦</Text></View></View></ScrollView>;
+  const { width, fontScale } = useWindowDimensions();
+  const heroStack = width < 360 || fontScale > 1.2;
+  const adviserStack = width < 360 || fontScale > 1.2 || width > 700;
+  const adviserChips = ['Fresh', 'For work', 'By mood'];
+  return <ScrollView contentContainerStyle={s.homePage} showsVerticalScrollIndicator={false}>
+    <View style={s.notice} accessibilityRole="text"><Text style={s.noticeLabel}>NOTICE</Text><Text style={s.noticeCopy}>NOVA ရနံ့များကို ရှာဖွေပြီး သင့်အတွက် သင့်တော်တာကို ရွေးချယ်ပါ။</Text></View>
+    <View style={s.homeContent}>
+      <View style={s.brandRow}><Image source={require('./assets/nova-logo-authentic.png')} style={s.brandLogo} resizeMode="contain" accessibilityLabel="NOVA" /><Pressable accessibilityRole="button" accessibilityLabel="Open your NOVA account" onPress={() => go('profile')} style={s.brandAccount}><Text style={s.brandAccountText}>Account</Text></Pressable></View>
+      <View style={[s.hero, heroStack && s.heroStack]}><View style={[s.heroCopyBlock, heroStack && s.heroCopyStack]}><Text style={s.heroKicker}>NOVA FRAGRANCE</Text><Text style={s.heroTitle}>Your scent.{`\n`}Your story.</Text><Text style={s.heroCopy}>သင့်ရဲ့ စတိုင်နဲ့ လိုက်ဖက်မယ့် ရနံ့ကို ရှာဖွေလိုက်ပါ။</Text><Pressable accessibilityRole="button" accessibilityLabel="Explore NOVA scents" onPress={() => go('discover')} style={s.heroButton}><Text style={s.heroButtonText}>Explore scents  →</Text></Pressable></View><Image source={require('./assets/nova-perfume-set.png')} style={[s.heroImage, heroStack && s.heroImageStack]} resizeMode="contain" accessibilityLabel="NOVA perfume set" /></View>
+      <View style={[s.adviserCard, adviserStack && s.adviserCardStack]}><View style={[s.adviserWords, adviserStack && s.adviserWordsStack]}><Text style={s.adviserKicker}>A LITTLE HELP, FROM NOVA</Text><Text style={s.adviserTitle}>Meet your Scent Adviser</Text><Text style={s.adviserCopy}>မေးလိုက်ပါ။ သင့်စိတ်ခံစားချက်နဲ့ အချိန်အခါအလိုက် ရနံ့ရွေးပေးမယ်။</Text><View style={s.adviserChips}>{adviserChips.map(chip => <Pressable key={chip} accessibilityRole="button" accessibilityLabel={`Ask NOVA about ${chip} scents`} onPress={() => go('advisor')} style={s.adviserChip}><Text style={s.adviserChipText}>{chip}</Text></Pressable>)}</View><Pressable accessibilityRole="button" accessibilityLabel="Ask NOVA Scent Adviser" onPress={() => go('advisor')} style={s.adviserCta}><Text style={s.adviserCtaText}>Ask NOVA  →</Text></Pressable></View><View style={[s.robotFrame, adviserStack && s.robotFrameStack]}><Image source={require('./assets/nova-ai-robot.jpg')} style={s.robotImage} resizeMode="contain" accessible={false} /></View></View>
+      <View style={s.sectionHead}><View><Text style={s.sectionTitle}>Find your favourite</Text><Text style={s.sectionSub}>NOVA ရနံ့များကို ရှာဖွေပါ</Text></View><Pressable accessibilityRole="button" accessibilityLabel="See all NOVA scents" onPress={() => go('discover')} style={s.seeAllButton}><Text style={s.seeAll}>See all  →</Text></Pressable></View>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.rowList}>{products.slice(0, 3).map(p => <Card key={p.id} p={p} onPress={() => pick(p)} />)}</ScrollView>
+    </View>
+  </ScrollView>;
 }
 function Discover({ pick }: { pick: (p: Product) => void }) {
+  const { width, fontScale } = useWindowDimensions();
+  const singleColumn = width < 360 || fontScale > 1.2;
   const [filter, setFilter] = useState('All'); const filters = ['All', 'Woody', 'Floral', 'Fresh', 'Oud'];
   const list = filter === 'All' ? products : products.filter(p => p.family.toLowerCase().includes(filter.toLowerCase()));
-  return <ScrollView contentContainerStyle={s.page} showsVerticalScrollIndicator={false}><View style={s.top}><View><Text style={s.eyebrow}>THE COLLECTION</Text><Text style={s.heading}>Discover NOVA.</Text></View><Text style={s.search}>⌕</Text></View><Text style={s.intro}>32 compositions. Infinite ways to be remembered.</Text><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.filters}>{filters.map(f => <Pressable key={f} onPress={() => setFilter(f)} style={[s.filter, filter === f && s.filterOn]}><Text style={[s.filterText, filter === f && s.filterTextOn]}>{f}</Text></Pressable>)}</ScrollView><View style={s.grid}>{list.map(p => <Card key={p.id} p={p} onPress={() => pick(p)} />)}</View></ScrollView>;
+  return <ScrollView contentContainerStyle={s.page} showsVerticalScrollIndicator={false}><View style={s.top}><View><Text style={s.eyebrow}>THE COLLECTION</Text><Text style={s.heading}>Discover NOVA.</Text></View><Text style={s.search}>⌕</Text></View><Text style={s.intro}>32 compositions. Infinite ways to be remembered.</Text><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.filters}>{filters.map(f => <Pressable key={f} onPress={() => setFilter(f)} style={[s.filter, filter === f && s.filterOn]}><Text style={[s.filterText, filter === f && s.filterTextOn]}>{f}</Text></Pressable>)}</ScrollView><View style={[s.grid, singleColumn && s.gridSingle]}>{list.map(p => <Card key={p.id} p={p} onPress={() => pick(p)} />)}</View></ScrollView>;
 }
 const API_URL = (process.env.EXPO_PUBLIC_API_URL || '').replace(/\/$/, '');
 const apiEndpoint = (route: string) => {
@@ -105,11 +126,11 @@ function RecommendationStrip({ items }: { items: Recommendation[] }) {
 }
 function Advisor() {
   const [input, setInput] = useState(''); const [loading, setLoading] = useState(false); const [profile, setProfile] = useState<FragranceProfile>(emptyProfile); const [profileId, setProfileId] = useState(''); const [purchaseHistory, setPurchaseHistory] = useState<PurchaseHistory[]>([]);
-  const [messages, setMessages] = useState<Message[]>([{ id: '1', from: 'nova', text: 'Hello, I’m NOVA. Think of me as your personal scent curator. How do you want to feel today?' }, { id: '2', from: 'nova', text: 'I can remember your favorite notes, moods, occasions, and dislikes to make future recommendations more personal.' }]);
+  const [messages, setMessages] = useState<Message[]>([{ id: '1', from: 'nova', text: 'မင်္ဂလာပါ။ NOVA Scent Adviser ပါ။ သင်နှစ်သက်တဲ့ ရနံ့၊ သုံးမယ့်အချိန်နဲ့ စိတ်ခံစားချက်ကို ပြောပြပါ။ သင့်အတွက် လိုက်ဖက်တဲ့ ရေမွှေးကို အတူရွေးကြမယ်။' }, { id: '2', from: 'nova', text: 'ဥပမာ — လန်းဆန်းတဲ့ ရနံ့လိုချင်တယ်၊ ရုံးတက်ဖို့ ရွေးပေးပါ၊ ဒါမှမဟုတ် ပန်းရနံ့ ကြိုက်တယ်လို့ မေးနိုင်ပါတယ်။' }]);
   useEffect(() => { getProfileId().then(async id => { setProfileId(id); try { if (isCloudUser(id)) { const cloud = await loadCloudProfile(id); setProfile(cloud || emptyProfile); } else { setProfile(await loadGuestProfile(id)); } } catch {} }); }, []);
   useEffect(() => { if (isCloudUser(profileId)) loadCloudPurchases().then(setPurchaseHistory).catch(() => {}); }, [profileId]);
   const send = async () => { const text = input.trim(); if (!text || loading || !profileId) return; const next = [...messages, { id: `${Date.now()}u`, from: 'user' as const, text }]; setMessages(next); setInput(''); setLoading(true); try { const res = await fetch(apiEndpoint('/api/scent-advisor'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ profileId, message: text, profile, purchaseHistory, history: messages.slice(-10) }) }); const data = await res.json(); if (!res.ok) throw new Error(data.error || 'Advisor unavailable'); const nextProfile = data.profile || profile; setProfile(nextProfile); if (isCloudUser(profileId)) { try { await saveCloudProfile(profileId, nextProfile); } catch { /* Do not discard a valid advisor reply on cloud sync failure. */ } } else await AsyncStorage.setItem(guestProfileKey(profileId), JSON.stringify(nextProfile)); setMessages(current => [...current, { id: `${Date.now()}n`, from: 'nova', text: data.reply, recommendations: data.recommendations || [] }]); } catch { setMessages(current => [...current, { id: `${Date.now()}e`, from: 'nova', text: 'I’m having trouble reaching my scent studio. Please check the API server and try again.' }]); } finally { setLoading(false); } };
-  return <SafeAreaView style={s.advisor}><View style={s.advisorHead}><View><Text style={s.eyebrow}>NOVA INTELLIGENCE</Text><Text style={s.heading}>Your scent advisor.</Text></View><Text style={s.online}>{loading ? '● THINKING' : '● ONLINE'}</Text></View><ScrollView contentContainerStyle={s.chat}><ProfileMemory profile={profile} />{messages.map(m => <View key={m.id} style={[s.bubble, m.from === 'user' && s.userBubble]}><Text style={[s.bubbleText, m.from === 'user' && s.userText]}>{m.text}</Text>{m.recommendations?.length ? <RecommendationStrip items={m.recommendations} /> : null}</View>)}{loading && <View style={s.bubble}><Text style={s.bubbleText}>Learning your preferences…</Text></View>}</ScrollView><View style={s.composer}><TextInput value={input} onChangeText={setInput} placeholder="Tell me a mood, note, or occasion..." placeholderTextColor="#9C968D" style={s.input} onSubmitEditing={send} returnKeyType="send" editable={!loading}/><Pressable onPress={send} style={s.send}><Text style={s.sendText}>↑</Text></Pressable></View></SafeAreaView>;
+  return <SafeAreaView style={s.advisor}><View style={s.advisorHead}><View><Text style={s.eyebrow}>NOVA INTELLIGENCE</Text><Text style={s.heading}>Scent Adviser</Text></View><Text style={s.online}>{loading ? 'THINKING…' : 'NOVA AI'}</Text></View><ScrollView contentContainerStyle={s.chat}><ProfileMemory profile={profile} />{messages.map(m => <View key={m.id} style={[s.bubble, m.from === 'user' && s.userBubble]}><Text style={[s.bubbleText, m.from === 'user' && s.userText]}>{m.text}</Text>{m.recommendations?.length ? <RecommendationStrip items={m.recommendations} /> : null}</View>)}{loading && <View style={s.bubble}><Text style={s.bubbleText}>Learning your preferences…</Text></View>}</ScrollView><View style={s.composer}><TextInput value={input} onChangeText={setInput} accessibilityLabel="Message NOVA Scent Adviser" placeholder="ရနံ့အကြောင်း မေးလိုက်ပါ…" placeholderTextColor="#9C968D" style={s.input} onSubmitEditing={send} returnKeyType="send" editable={!loading}/><Pressable accessibilityRole="button" accessibilityLabel="Send message" disabled={loading || !input.trim() || !profileId} onPress={send} style={s.send}><Text style={s.sendText}>↑</Text></Pressable></View></SafeAreaView>;
 }
 function Profile({ onSignOut }: { onSignOut: () => void }) {
   const [profile, setProfile] = useState<FragranceProfile>(emptyProfile);
@@ -164,10 +185,10 @@ function Detail({ p, close }: { p: Product; close: () => void }) {
     } catch (error: any) { setOrderStatus(error?.message || 'Unable to send order. Please try again later.'); }
     finally { sendingRef.current = false; setSending(false); }
   };
-  const field = { backgroundColor: '#FFFDF9', borderWidth: 1, borderColor: '#E6DDD3', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, color: '#302A25', fontSize: 13, marginTop: 9 } as const;
-  return <SafeAreaView style={s.detail}><ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 35 }}><Pressable onPress={close}><Text style={s.back}>‹  Back</Text></Pressable><View style={s.detailVisual}><Bottle p={p} /></View><Text style={s.eyebrow}>{p.family.toUpperCase()}</Text><Text style={s.detailTitle}>{p.name}</Text><Text style={s.detailNotes}>{p.notes}</Text><Text style={s.detailDescription}>{p.bioMyanmar || 'A luminous composition designed to stay close to the skin and linger in memory. Discover your new signature.'}</Text><Text style={s.detailMeta}>{p.category} · {p.brand} · Inspired by {p.originalReference}</Text><Text style={{ color: '#9B6E49', fontSize: 11, fontWeight: '700', letterSpacing: 1.5, marginTop: 26 }}>ORDER VIA NOVA</Text><TextInput value={name} onChangeText={setName} placeholder="Customer name" placeholderTextColor="#A39A91" style={field} /><TextInput value={phone} onChangeText={setPhone} placeholder="Phone number" placeholderTextColor="#A39A91" keyboardType="phone-pad" style={field} /><TextInput value={address} onChangeText={setAddress} placeholder="Delivery address" placeholderTextColor="#A39A91" multiline style={[field, { minHeight: 70, textAlignVertical: 'top' }]} /><View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 9 }}><TextInput value={quantity} onChangeText={setQuantity} placeholder="Qty" placeholderTextColor="#A39A91" keyboardType="number-pad" style={[field, { flex: 1, marginTop: 0 }]} /><Text style={{ color: '#9B6E49', fontSize: 18, fontWeight: '700', marginLeft: 14 }}>{p.price}</Text></View><Pressable onPress={submitOrder} disabled={sending} style={[s.add, { marginTop: 16, alignItems: 'center', opacity: sending ? 0.6 : 1 }]}><Text style={s.addText}>{sending ? 'Sending order…' : 'Send order request  →'}</Text></Pressable>{orderStatus ? <Text accessibilityRole="alert" style={{ color: '#80583D', marginTop: 12, lineHeight: 20 }}>{orderStatus}</Text> : null}</ScrollView></SafeAreaView>;
+  const field = { backgroundColor: '#FFFDF9', borderWidth: 1, borderColor: '#E6DDD3', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, color: '#102B62', fontSize: 13, marginTop: 9 } as const;
+  return <SafeAreaView style={s.detail}><ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 35 }}><Pressable onPress={close}><Text style={s.back}>‹  Back</Text></Pressable><View style={s.detailVisual}><Bottle p={p} /></View><Text style={s.eyebrow}>{p.family.toUpperCase()}</Text><Text style={s.detailTitle}>{p.name}</Text><Text style={s.detailNotes}>{p.notes}</Text><Text style={s.detailDescription}>{p.bioMyanmar || 'A luminous composition designed to stay close to the skin and linger in memory. Discover your new signature.'}</Text><Text style={s.detailMeta}>{p.category} · {p.brand} · Inspired by {p.originalReference}</Text><Text style={{ color: '#946D25', fontSize: 11, fontWeight: '700', letterSpacing: 1.5, marginTop: 26 }}>ORDER VIA NOVA</Text><TextInput value={name} onChangeText={setName} placeholder="Customer name" placeholderTextColor="#A39A91" style={field} /><TextInput value={phone} onChangeText={setPhone} placeholder="Phone number" placeholderTextColor="#A39A91" keyboardType="phone-pad" style={field} /><TextInput value={address} onChangeText={setAddress} placeholder="Delivery address" placeholderTextColor="#A39A91" multiline style={[field, { minHeight: 70, textAlignVertical: 'top' }]} /><View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 9 }}><TextInput value={quantity} onChangeText={setQuantity} placeholder="Qty" placeholderTextColor="#A39A91" keyboardType="number-pad" style={[field, { flex: 1, marginTop: 0 }]} /><Text style={{ color: '#946D25', fontSize: 18, fontWeight: '700', marginLeft: 14 }}>{p.price}</Text></View><Pressable onPress={submitOrder} disabled={sending} style={[s.add, { marginTop: 16, alignItems: 'center', opacity: sending ? 0.6 : 1 }]}><Text style={s.addText}>{sending ? 'Sending order…' : 'Send order request  →'}</Text></Pressable>{orderStatus ? <Text accessibilityRole="alert" style={{ color: '#80583D', marginTop: 12, lineHeight: 20 }}>{orderStatus}</Text> : null}</ScrollView></SafeAreaView>;
 }
-export default function App() {
+function NovaApp() {
   const [tab, setTab] = useState<Tab>('home');
   const [selected, setSelected] = useState<Product | null>(null);
   const [session, setSession] = useState<string | null>(null);
@@ -188,6 +209,170 @@ export default function App() {
     })();
     return () => { active = false; subscription?.unsubscribe(); };
   }, []);
- if (booting) return <SafeAreaView style={s.auth}><StatusBar style="dark" /></SafeAreaView>; if (!session) return <><StatusBar style="dark" /><AuthScreen onAuth={setSession} /></>; if (selected) return <><StatusBar style="dark" /><Detail p={selected} close={() => setSelected(null)} /></>; const screen = tab === 'home' ? <Home go={setTab} pick={setSelected} /> : tab === 'discover' ? <Discover pick={setSelected} /> : tab === 'advisor' ? <Advisor /> : <Profile onSignOut={async () => { if (supabase) await supabase.auth.signOut(); await AsyncStorage.removeItem('@nova/local-session'); setTab('home'); setSelected(null); setSession(null); }} />; return <SafeAreaView style={s.app}><StatusBar style="dark" />{screen}<View style={s.nav}>{([['home', '⌂', 'Home'], ['discover', '◒', 'Discover'], ['advisor', '✦', 'Advisor'], ['profile', '○', 'Profile']] as const).map(([key, icon, label]) => <Pressable key={key} onPress={() => setTab(key)} style={s.navItem}><Text style={[s.navIcon, tab === key && s.navActive]}>{icon}</Text><Text style={[s.navLabel, tab === key && s.navActive]}>{label}</Text></Pressable>)}</View></SafeAreaView>; }
+ if (booting) return <SafeAreaView style={s.auth}><StatusBar style="dark" /></SafeAreaView>; if (selected) return <><StatusBar style="dark" /><Detail p={selected} close={() => setSelected(null)} /></>; const screen = tab === 'home' ? <Home go={setTab} pick={setSelected} /> : tab === 'discover' ? <Discover pick={setSelected} /> : tab === 'advisor' ? <Advisor /> : !session ? <AuthScreen onAuth={setSession} /> : <Profile onSignOut={async () => { if (supabase) await supabase.auth.signOut(); await AsyncStorage.removeItem('@nova/local-session'); setTab('home'); setSelected(null); setSession(null); }} />; return <SafeAreaView style={s.app}><StatusBar style="dark" />{screen}<View style={s.nav}>{([['home', '⌂', 'Home'], ['discover', '◒', 'Discover'], ['advisor', '✦', 'Advisor'], ['profile', '○', 'Profile']] as const).map(([key, icon, label]) => <Pressable key={key} onPress={() => setTab(key)} style={s.navItem}><Text style={[s.navIcon, tab === key && s.navActive]}>{icon}</Text><Text style={[s.navLabel, tab === key && s.navActive]}>{label}</Text></Pressable>)}</View></SafeAreaView>; }
 
-const s = StyleSheet.create({ app: { flex: 1, backgroundColor: '#F8F6F1' }, page: { padding: 24, paddingBottom: 110 }, top: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 26 }, eyebrow: { fontSize: 10, letterSpacing: 2, color: '#9B6E49', fontWeight: '700' }, heading: { color: '#201E1B', fontSize: 29, fontWeight: '500', marginTop: 6, letterSpacing: -1 }, avatar: { width: 42, height: 42, borderRadius: 21, backgroundColor: '#25221F', justifyContent: 'center', alignItems: 'center' }, avatarText: { color: '#E7C99D', fontSize: 18, fontWeight: '700' }, hero: { height: 286, borderRadius: 24, padding: 24, backgroundColor: '#2C2825', overflow: 'hidden', marginBottom: 30 }, heroGlow: { position: 'absolute', right: -35, top: -50, width: 220, height: 220, borderRadius: 110, backgroundColor: '#6E4934', opacity: .7 }, aiKicker: { color: '#D7AA7A', fontSize: 10, fontWeight: '700', letterSpacing: 2 }, heroTitle: { color: '#FFF9F1', fontSize: 27, lineHeight: 32, marginTop: 15, fontWeight: '500', letterSpacing: -.5 }, heroCopy: { color: '#C5BDB4', fontSize: 13, lineHeight: 20, marginTop: 14, width: '77%' }, heroButton: { position: 'absolute', bottom: 22, left: 24, borderBottomWidth: 1, borderColor: '#B8895C', paddingBottom: 5 }, heroButtonText: { color: '#E8C7A1', fontSize: 12, fontWeight: '600' }, sectionHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 15 }, sectionTitle: { color: '#24211E', fontSize: 20, fontWeight: '600' }, sectionSub: { color: '#9B968E', fontSize: 12, marginTop: 5 }, seeAll: { color: '#9B6E49', fontWeight: '700', fontSize: 12 }, rowList: { gap: 14, paddingBottom: 28 }, card: { width: 215, backgroundColor: '#FFFDF9', borderRadius: 17, overflow: 'hidden', marginRight: 14 }, productImage: { height: 184, backgroundColor: '#F0E9DE', justifyContent: 'center', alignItems: 'center', position: 'relative' }, cardTag: { position: 'absolute', top: 12, left: 12, fontSize: 9, color: '#9B6E49', fontWeight: '700', letterSpacing: .5 }, heart: { position: 'absolute', right: 12, top: 9, color: '#716A62', fontSize: 22 }, cardBody: { padding: 14 }, row: { flexDirection: 'row', justifyContent: 'space-between' }, productName: { color: '#25211E', fontSize: 14, fontWeight: '700' }, price: { color: '#9B6E49', fontWeight: '700', fontSize: 13 }, family: { color: '#8D867D', fontSize: 11, marginTop: 5 }, notes: { color: '#B1AAA1', fontSize: 10, marginTop: 7 }, bottleWrap: { alignItems: 'center', justifyContent: 'flex-end', height: 178 }, bottleWrapSmall: { height: 135 }, productPhoto: { width: 190, height: 178, borderRadius: 12 }, productPhotoSmall: { width: 135, height: 125, borderRadius: 10 }, cap: { width: 39, height: 34, borderTopLeftRadius: 4, borderTopRightRadius: 4, opacity: .95 }, capSmall: { width: 28, height: 25 }, bottle: { width: 75, height: 112, borderRadius: 7, justifyContent: 'center', alignItems: 'center', shadowColor: '#5A3E2C', shadowOpacity: .18, shadowRadius: 8, elevation: 4 }, bottleSmall: { width: 55, height: 82, borderRadius: 6 }, shine: { position: 'absolute', left: 9, top: 10, width: 9, height: 78, borderRadius: 4, backgroundColor: '#FFF', opacity: .22 }, bottleMark: { color: '#6D4C3A', fontSize: 28, fontWeight: '300', fontFamily: 'serif' }, bottleMarkSmall: { fontSize: 21 }, bottleWord: { color: '#6D4C3A', fontSize: 7, letterSpacing: 2, marginTop: 4 }, editCard: { backgroundColor: '#E9DFD1', borderRadius: 20, padding: 20, minHeight: 170, flexDirection: 'row', overflow: 'hidden' }, editTitle: { color: '#382B24', fontSize: 20, fontWeight: '600', marginTop: 8 }, editCopy: { color: '#7D6B5D', fontSize: 12, lineHeight: 18, marginTop: 8, maxWidth: 215 }, link: { color: '#93623D', fontSize: 12, fontWeight: '700', marginTop: 15 }, orb: { width: 85, height: 85, borderRadius: 43, backgroundColor: '#BE936D', alignItems: 'center', justifyContent: 'center', marginTop: 28, marginRight: -20 }, orbText: { color: '#FAE9CE', fontSize: 34 }, intro: { color: '#766F67', lineHeight: 20, fontSize: 14, marginBottom: 20 }, search: { fontSize: 28, color: '#7E756D' }, filters: { gap: 8, paddingBottom: 25 }, filter: { paddingVertical: 9, paddingHorizontal: 17, borderRadius: 18, borderWidth: 1, borderColor: '#E2DCD2' }, filterOn: { backgroundColor: '#2A2521', borderColor: '#2A2521' }, filterText: { color: '#9B948B', fontSize: 12 }, filterTextOn: { color: '#F7EEE3', fontWeight: '700' }, grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', gap: 12 }, advisor: { flex: 1, backgroundColor: '#F8F6F1' }, advisorHead: { paddingHorizontal: 24, paddingTop: 12, paddingBottom: 20, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }, online: { color: '#6D8B6F', fontSize: 10, letterSpacing: 1, fontWeight: '700' }, chat: { padding: 24, paddingTop: 10, gap: 13, paddingBottom: 30 }, bubble: { backgroundColor: '#EDE5DA', padding: 15, borderRadius: 18, borderBottomLeftRadius: 4, maxWidth: '88%' }, userBubble: { backgroundColor: '#2C2825', alignSelf: 'flex-end', borderBottomLeftRadius: 18, borderBottomRightRadius: 4 }, bubbleText: { color: '#4D4239', fontSize: 14, lineHeight: 21 }, userText: { color: '#F7EEE3' }, composer: { flexDirection: 'row', padding: 14, borderTopWidth: 1, borderTopColor: '#E6E0D7', backgroundColor: '#FFFCF7', alignItems: 'center' }, input: { flex: 1, paddingHorizontal: 15, paddingVertical: 12, color: '#2B2622', backgroundColor: '#F3EEE7', borderRadius: 24, fontSize: 13 }, send: { width: 43, height: 43, borderRadius: 22, marginLeft: 8, backgroundColor: '#9B6E49', alignItems: 'center', justifyContent: 'center' }, sendText: { color: 'white', fontSize: 22 }, memoryCard: { backgroundColor: '#E9DFD1', borderRadius: 18, padding: 16, marginBottom: 14 }, memoryTitleRow: { flexDirection: 'row', justifyContent: 'space-between' }, memoryTitle: { color: '#3B2D25', fontSize: 15, fontWeight: '700' }, memorySpark: { color: '#9B6E49', fontSize: 18 }, memoryCopy: { color: '#796B60', fontSize: 12, lineHeight: 18, marginTop: 6 }, chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 10 }, chip: { backgroundColor: '#F8F1E8', borderRadius: 12, paddingHorizontal: 9, paddingVertical: 5 }, chipText: { color: '#8E6445', fontSize: 10, fontWeight: '600' }, memoryMeta: { color: '#967457', fontSize: 11, marginTop: 9 }, profileMemory: { backgroundColor: '#2C2825', borderRadius: 20, padding: 20, marginBottom: 20 }, profileMemoryKicker: { color: '#D7AA7A', fontSize: 10, letterSpacing: 1.5, fontWeight: '700' }, profileMemoryTitle: { color: '#FFF9F1', fontSize: 22, fontWeight: '500', marginTop: 10 }, profileMemoryCopy: { color: '#C5BDB4', fontSize: 12, lineHeight: 18, marginTop: 8 }, profileRow: { backgroundColor: '#FFFDF9', borderBottomWidth: 1, borderBottomColor: '#F0ECE6', padding: 15 }, profileRowLabel: { color: '#8E867E', fontSize: 11 }, profileRowValue: { color: '#3F3831', fontSize: 13, marginTop: 5 }, auth: { flex: 1, backgroundColor: '#F8F6F1' }, authContent: { padding: 28, alignItems: 'center', paddingTop: 56 }, authLogo: { width: 64, height: 64, borderRadius: 32, backgroundColor: '#2C2825', alignItems: 'center', justifyContent: 'center' }, authLogoText: { color: '#E7C99D', fontSize: 28, fontWeight: '700' }, authBrand: { color: '#2C2825', fontSize: 19, letterSpacing: 6, fontWeight: '700', marginTop: 15 }, authTagline: { color: '#9B6E49', fontSize: 13, marginTop: 8, textAlign: 'center' }, authPanel: { alignSelf: 'stretch', backgroundColor: '#FFFDF9', borderRadius: 22, padding: 22, marginTop: 38 }, authTitle: { color: '#29231F', fontSize: 24, fontWeight: '600' }, authSub: { color: '#958C83', fontSize: 12, lineHeight: 18, marginTop: 7, marginBottom: 20 }, authInput: { backgroundColor: '#F3EEE7', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 13, color: '#302A25', fontSize: 13, marginBottom: 10 }, authButton: { backgroundColor: '#2C2825', borderRadius: 12, paddingVertical: 15, alignItems: 'center', marginTop: 4 }, authButtonText: { color: '#F7EEE3', fontSize: 13, fontWeight: '700' }, authSwitch: { flexDirection: 'row', justifyContent: 'center', marginTop: 18 }, authSwitchText: { color: '#958C83', fontSize: 12 }, authLink: { color: '#9B6E49', fontSize: 12, fontWeight: '700' }, guestLink: { color: '#9B6E49', fontSize: 13, fontWeight: '700', marginTop: 25 }, authError: { color: '#A35F4B', fontSize: 11, lineHeight: 16, textAlign: 'center', marginTop: 16 }, localNote: { color: '#B3ABA2', fontSize: 10, marginTop: 14, textAlign: 'center' }, profileTop: { alignItems: 'center', paddingVertical: 35 }, largeAvatar: { width: 84, height: 84, borderRadius: 42, backgroundColor: '#2C2825', alignItems: 'center', justifyContent: 'center', marginBottom: 18 }, largeAvatarText: { color: '#E7C99D', fontSize: 34, fontWeight: '700' }, profileName: { fontSize: 20, color: '#28231F', fontWeight: '600' }, profileSub: { color: '#9C958C', marginTop: 7 }, menu: { backgroundColor: '#FFFDF9', padding: 19, borderBottomWidth: 1, borderBottomColor: '#F0ECE6', flexDirection: 'row', justifyContent: 'space-between' }, menuText: { color: '#4D4640', fontSize: 14 }, chevron: { color: '#B4ACA2', fontSize: 22 }, nav: { flexShrink: 0, height: 76, backgroundColor: '#FFFCF7', borderTopWidth: 1, borderTopColor: '#EEE8DF', flexDirection: 'row', justifyContent: 'space-around', paddingTop: 11 }, navItem: { alignItems: 'center', width: 70 }, navIcon: { color: '#B5ADA3', fontSize: 22, height: 28 }, navLabel: { color: '#A7A097', fontSize: 10, marginTop: 3 }, navActive: { color: '#9B6E49', fontWeight: '700' }, pressed: { opacity: .78 }, detail: { flex: 1, padding: 24, backgroundColor: '#F8F6F1' }, back: { color: '#8F694A', fontSize: 14, marginBottom: 15 }, detailVisual: { height: 340, backgroundColor: '#EDE3D5', borderRadius: 26, alignItems: 'center', justifyContent: 'center', marginBottom: 25 }, detailTitle: { fontSize: 32, color: '#28231F', fontWeight: '500', marginTop: 8 }, detailNotes: { color: '#9B6E49', fontSize: 14, marginTop: 8 }, detailDescription: { color: '#7F776E', fontSize: 14, lineHeight: 22, marginTop: 23, maxWidth: 320 }, detailMeta: { color: '#9B6E49', fontSize: 11, lineHeight: 17, marginTop: 12, maxWidth: 320 }, detailBottom: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 35 }, detailPrice: { color: '#2A2521', fontSize: 24, fontWeight: '600' }, add: { backgroundColor: '#2C2825', borderRadius: 24, paddingVertical: 14, paddingHorizontal: 21 }, addText: { color: '#F7EEE3', fontWeight: '700', fontSize: 12 } });
+export default function App() {
+  return <SafeAreaProvider><NovaApp /></SafeAreaProvider>;
+}
+
+const s = StyleSheet.create({
+homePage: { paddingBottom: 24 },
+notice: { backgroundColor: '#102B62', paddingHorizontal: 16, paddingVertical: 8, minHeight: 34, flexDirection: 'row', alignItems: 'center', gap: 8 },
+noticeLabel: { color: '#E8C977', fontSize: 8, letterSpacing: 1.2, fontWeight: '800', flexShrink: 1 },
+noticeCopy: { color: '#FFF9ED', fontSize: 10, lineHeight: 16, flex: 1 },
+homeContent: { paddingHorizontal: 18 },
+brandRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: 14, paddingBottom: 12 },
+brandLogo: { width: 112, height: 34 },
+brandAccount: { minWidth: 44, minHeight: 44, paddingHorizontal: 8, alignItems: 'center', justifyContent: 'center' },
+brandAccountText: { color: '#102B62', fontSize: 11, fontWeight: '700' },
+hero: { minHeight: 224, backgroundColor: '#102B62', borderRadius: 20, padding: 18, overflow: 'hidden', flexDirection: 'row', alignItems: 'center', marginBottom: 14 },
+heroCopyBlock: { flex: 1, zIndex: 1 },
+heroKicker: { color: '#E8C977', fontSize: 8, letterSpacing: 1.4, fontWeight: '800' },
+heroTitle: { color: '#FFF9ED', fontSize: 28, lineHeight: 31, fontWeight: '600', marginTop: 9, letterSpacing: -.4 },
+heroCopy: { color: '#E3E7EF', fontSize: 11, lineHeight: 18, marginTop: 10, maxWidth: 190 },
+heroImage: { width: '42%', maxWidth: 148, height: 168, marginRight: -12, marginLeft: -5 },
+heroStack: { minHeight: 0, flexDirection: 'column', alignItems: 'stretch' },
+heroCopyStack: { width: '100%' },
+heroImageStack: { width: '100%', maxWidth: 230, height: 150, alignSelf: 'center', marginTop: 4, marginRight: 0, marginLeft: 0 },
+heroButton: { minHeight: 44, alignSelf: 'flex-start', justifyContent: 'center', paddingHorizontal: 14, borderRadius: 10, backgroundColor: '#E8C977', marginTop: 13 },
+heroButtonText: { color: '#102B62', fontSize: 11, fontWeight: '800' },
+adviserCard: { backgroundColor: '#F2E9DA', borderRadius: 18, padding: 15, minHeight: 174, flexDirection: 'row', alignItems: 'center', overflow: 'hidden', marginBottom: 26, borderWidth: 1, borderColor: '#E4D6C2' },
+adviserWords: { flex: 1, paddingRight: 8 },
+adviserKicker: { color: '#946D25', fontSize: 8, letterSpacing: 1.1, fontWeight: '800' },
+adviserTitle: { color: '#102B62', fontSize: 19, lineHeight: 24, fontWeight: '700', marginTop: 6 },
+adviserCopy: { color: '#665D55', fontSize: 11, lineHeight: 17, marginTop: 6 },
+adviserChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 5, marginTop: 10 },
+adviserChip: { minHeight: 34, paddingHorizontal: 10, borderRadius: 17, justifyContent: 'center', backgroundColor: '#FFFDF9', borderWidth: 1, borderColor: '#D9C7AC' },
+adviserChipText: { color: '#5D4C3E', fontSize: 10, fontWeight: '700' },
+robotFrame: { width: 92, height: 122, borderRadius: 16, backgroundColor: '#FFFFFF', overflow: 'hidden' },
+robotImage: { width: '100%', height: '100%' },
+adviserCardStack: { flexDirection: 'column', alignItems: 'stretch' },
+adviserWordsStack: { width: '100%', paddingRight: 0 },
+robotFrameStack: { width: '100%', height: 150, marginTop: 12 },
+adviserCta: { minHeight: 44, alignSelf: 'flex-start', justifyContent: 'center', marginTop: 8, paddingHorizontal: 2 },
+adviserCtaText: { color: '#102B62', fontSize: 12, fontWeight: '800' },
+sectionHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 12 },
+sectionTitle: { color: '#102B62', fontSize: 19, fontWeight: '700' },
+sectionSub: { color: '#9B968E', fontSize: 11, marginTop: 4 },
+seeAllButton: { minHeight: 44, justifyContent: 'center', paddingLeft: 8 },
+seeAll: { color: '#946D25', fontWeight: '800', fontSize: 11 },
+rowList: { gap: 12, paddingBottom: 10 },
+card: { width: 188, backgroundColor: '#FFFDF9', borderRadius: 16, overflow: 'hidden', marginRight: 0 },
+productImage: { height: 158, backgroundColor: '#F0E9DE', justifyContent: 'center', alignItems: 'center', position: 'relative' },
+cardTag: { position: 'absolute', top: 10, left: 10, fontSize: 8, color: '#946D25', fontWeight: '800', letterSpacing: .5 },
+heart: { position: 'absolute', right: 10, top: 7, color: '#716A62', fontSize: 21 },
+cardBody: { padding: 12 },
+productName: { color: '#102B62', fontSize: 13, fontWeight: '700', flexShrink: 1, minWidth: 0 },
+price: { color: '#946D25', fontWeight: '700', fontSize: 12, flexShrink: 0 },
+family: { color: '#8D867D', fontSize: 10, marginTop: 4 },
+notes: { color: '#B1AAA1', fontSize: 9, marginTop: 6 },
+bottleWrapSmall: { height: 120 },
+productPhotoSmall: { width: 125, height: 116, borderRadius: 10 },
+capSmall: { width: 26, height: 23 },
+bottleSmall: { width: 52, height: 78, borderRadius: 6 },
+bottleMarkSmall: { fontSize: 20 },
+app: { flex: 1, width: '100%', maxWidth: 760, alignSelf: 'center', backgroundColor: '#FBF7EF' },
+page: { padding: 24, paddingBottom: 110 },
+top: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 26 },
+eyebrow: { fontSize: 10, letterSpacing: 2, color: '#946D25', fontWeight: '700' },
+heading: { color: '#102B62', fontSize: 25, fontWeight: '500', marginTop: 6, letterSpacing: -1 },
+avatar: { width: 42, height: 42, borderRadius: 21, backgroundColor: '#102B62', justifyContent: 'center', alignItems: 'center' },
+avatarText: { color: '#E7C99D', fontSize: 18, fontWeight: '700' },
+heroGlow: { position: 'absolute', right: -35, top: -50, width: 220, height: 220, borderRadius: 110, backgroundColor: '#6E4934', opacity: .7 },
+aiKicker: { color: '#D8B768', fontSize: 10, fontWeight: '700', letterSpacing: 2 },
+row: { flexDirection: 'row', justifyContent: 'space-between' },
+productRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'baseline', columnGap: 6 },
+bottleWrap: { alignItems: 'center', justifyContent: 'flex-end', height: 178 },
+productPhoto: { width: 190, height: 178, borderRadius: 12 },
+cap: { width: 39, height: 34, borderTopLeftRadius: 4, borderTopRightRadius: 4, opacity: .95 },
+bottle: { width: 75, height: 112, borderRadius: 7, justifyContent: 'center', alignItems: 'center', shadowColor: '#5A3E2C', shadowOpacity: .18, shadowRadius: 8, elevation: 4 },
+shine: { position: 'absolute', left: 9, top: 10, width: 9, height: 78, borderRadius: 4, backgroundColor: '#FFF', opacity: .22 },
+bottleMark: { color: '#6D4C3A', fontSize: 28, fontWeight: '300', fontFamily: 'serif' },
+bottleWord: { color: '#6D4C3A', fontSize: 7, letterSpacing: 2, marginTop: 4 },
+editCard: { backgroundColor: '#F0E7D4', borderRadius: 20, padding: 20, minHeight: 170, flexDirection: 'row', overflow: 'hidden' },
+editTitle: { color: '#382B24', fontSize: 20, fontWeight: '600', marginTop: 8 },
+editCopy: { color: '#7D6B5D', fontSize: 12, lineHeight: 18, marginTop: 8, maxWidth: 215 },
+link: { color: '#93623D', fontSize: 12, fontWeight: '700', marginTop: 15 },
+orb: { width: 85, height: 85, borderRadius: 43, backgroundColor: '#BE936D', alignItems: 'center', justifyContent: 'center', marginTop: 28, marginRight: -20 },
+orbText: { color: '#FAE9CE', fontSize: 34 },
+intro: { color: '#766F67', lineHeight: 20, fontSize: 14, marginBottom: 20 },
+search: { fontSize: 28, color: '#7E756D' },
+filters: { gap: 8, paddingBottom: 25 },
+filter: { paddingVertical: 9, paddingHorizontal: 17, borderRadius: 18, borderWidth: 1, borderColor: '#E2DCD2' },
+filterOn: { backgroundColor: '#102B62', borderColor: '#102B62' },
+filterText: { color: '#9B948B', fontSize: 12 },
+filterTextOn: { color: '#F7EEE3', fontWeight: '700' },
+grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', gap: 12 },
+gridSingle: { justifyContent: 'flex-start' },
+advisor: { flex: 1, backgroundColor: '#FBF7EF' },
+advisorHead: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 20, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+online: { color: '#6D8B6F', fontSize: 10, letterSpacing: 1, fontWeight: '700' },
+chat: { padding: 24, paddingTop: 10, gap: 13, paddingBottom: 30 },
+bubble: { backgroundColor: '#F2EBDD', padding: 15, borderRadius: 18, borderBottomLeftRadius: 4, maxWidth: '88%' },
+userBubble: { backgroundColor: '#102B62', alignSelf: 'flex-end', borderBottomLeftRadius: 18, borderBottomRightRadius: 4 },
+bubbleText: { color: '#263D67', fontSize: 14, lineHeight: 21 },
+userText: { color: '#F7EEE3' },
+composer: { flexDirection: 'row', padding: 14, borderTopWidth: 1, borderTopColor: '#E6E0D7', backgroundColor: '#FFFCF7', alignItems: 'center' },
+input: { flex: 1, paddingHorizontal: 15, paddingVertical: 12, color: '#102B62', backgroundColor: '#F3EEE7', borderRadius: 24, fontSize: 13 },
+send: { width: 43, height: 43, borderRadius: 22, marginLeft: 8, backgroundColor: '#946D25', alignItems: 'center', justifyContent: 'center' },
+sendText: { color: 'white', fontSize: 22 },
+memoryCard: { backgroundColor: '#F0E7D4', borderRadius: 18, padding: 16, marginBottom: 14 },
+memoryTitleRow: { flexDirection: 'row', justifyContent: 'space-between' },
+memoryTitle: { color: '#102B62', fontSize: 15, fontWeight: '700' },
+memorySpark: { color: '#946D25', fontSize: 18 },
+memoryCopy: { color: '#796B60', fontSize: 12, lineHeight: 18, marginTop: 6 },
+chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 10 },
+chip: { backgroundColor: '#F8F1E8', borderRadius: 12, paddingHorizontal: 9, paddingVertical: 5 },
+chipText: { color: '#8E6445', fontSize: 10, fontWeight: '600' },
+memoryMeta: { color: '#967457', fontSize: 11, marginTop: 9 },
+profileMemory: { backgroundColor: '#102B62', borderRadius: 20, padding: 20, marginBottom: 20 },
+profileMemoryKicker: { color: '#D8B768', fontSize: 10, letterSpacing: 1.5, fontWeight: '700' },
+profileMemoryTitle: { color: '#FFF9F1', fontSize: 22, fontWeight: '500', marginTop: 10 },
+profileMemoryCopy: { color: '#C5BDB4', fontSize: 12, lineHeight: 18, marginTop: 8 },
+profileRow: { backgroundColor: '#FFFDF9', borderBottomWidth: 1, borderBottomColor: '#F0ECE6', padding: 15 },
+profileRowLabel: { color: '#8E867E', fontSize: 11 },
+profileRowValue: { color: '#3F3831', fontSize: 13, marginTop: 5 },
+auth: { flex: 1, backgroundColor: '#FBF7EF' },
+authContent: { padding: 28, alignItems: 'center', paddingTop: 56 },
+authLogo: { width: 64, height: 64, borderRadius: 32, backgroundColor: '#102B62', alignItems: 'center', justifyContent: 'center' },
+authLogoText: { color: '#E7C99D', fontSize: 28, fontWeight: '700' },
+authBrand: { color: '#102B62', fontSize: 19, letterSpacing: 6, fontWeight: '700', marginTop: 15 },
+authTagline: { color: '#946D25', fontSize: 13, marginTop: 8, textAlign: 'center' },
+authPanel: { alignSelf: 'stretch', backgroundColor: '#FFFDF9', borderRadius: 22, padding: 22, marginTop: 38 },
+authTitle: { color: '#102B62', fontSize: 24, fontWeight: '600' },
+authSub: { color: '#958C83', fontSize: 12, lineHeight: 18, marginTop: 7, marginBottom: 20 },
+authInput: { backgroundColor: '#F3EEE7', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 13, color: '#102B62', fontSize: 13, marginBottom: 10 },
+authButton: { backgroundColor: '#102B62', borderRadius: 12, paddingVertical: 15, alignItems: 'center', marginTop: 4 },
+authButtonText: { color: '#F7EEE3', fontSize: 13, fontWeight: '700' },
+authSwitch: { flexDirection: 'row', justifyContent: 'center', marginTop: 18 },
+authSwitchText: { color: '#958C83', fontSize: 12 },
+authLink: { color: '#946D25', fontSize: 12, fontWeight: '700' },
+guestLink: { color: '#946D25', fontSize: 13, fontWeight: '700', marginTop: 25 },
+authError: { color: '#A35F4B', fontSize: 11, lineHeight: 16, textAlign: 'center', marginTop: 16 },
+localNote: { color: '#B3ABA2', fontSize: 10, marginTop: 14, textAlign: 'center' },
+profileTop: { alignItems: 'center', paddingVertical: 35 },
+largeAvatar: { width: 84, height: 84, borderRadius: 42, backgroundColor: '#102B62', alignItems: 'center', justifyContent: 'center', marginBottom: 18 },
+largeAvatarText: { color: '#E7C99D', fontSize: 34, fontWeight: '700' },
+profileName: { fontSize: 20, color: '#102B62', fontWeight: '600' },
+profileSub: { color: '#9C958C', marginTop: 7 },
+menu: { backgroundColor: '#FFFDF9', padding: 19, borderBottomWidth: 1, borderBottomColor: '#F0ECE6', flexDirection: 'row', justifyContent: 'space-between' },
+menuText: { color: '#4D4640', fontSize: 14 },
+chevron: { color: '#B4ACA2', fontSize: 22 },
+nav: { flexShrink: 0, minHeight: 76, backgroundColor: '#FFFCF7', borderTopWidth: 1, borderTopColor: '#EEE8DF', flexDirection: 'row', justifyContent: 'space-around', paddingTop: 11, paddingBottom: 8 },
+navItem: { alignItems: 'center', justifyContent: 'center', minWidth: 64, minHeight: 52, flex: 1, paddingHorizontal: 3 },
+navIcon: { color: '#B5ADA3', fontSize: 22, height: 28 },
+navLabel: { color: '#A7A097', fontSize: 10, marginTop: 3, textAlign: 'center', flexShrink: 1 },
+navActive: { color: '#946D25', fontWeight: '700' },
+pressed: { opacity: .78 },
+detail: { flex: 1, padding: 24, backgroundColor: '#FBF7EF' },
+back: { color: '#8F694A', fontSize: 14, marginBottom: 15 },
+detailVisual: { height: 340, backgroundColor: '#EDE3D5', borderRadius: 26, alignItems: 'center', justifyContent: 'center', marginBottom: 25 },
+detailTitle: { fontSize: 32, color: '#102B62', fontWeight: '500', marginTop: 8 },
+detailNotes: { color: '#946D25', fontSize: 14, marginTop: 8 },
+detailDescription: { color: '#7F776E', fontSize: 14, lineHeight: 22, marginTop: 23, maxWidth: 320 },
+detailMeta: { color: '#946D25', fontSize: 11, lineHeight: 17, marginTop: 12, maxWidth: 320 },
+detailBottom: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 35 },
+detailPrice: { color: '#102B62', fontSize: 24, fontWeight: '600' },
+add: { backgroundColor: '#102B62', borderRadius: 24, paddingVertical: 14, paddingHorizontal: 21 },
+addText: { color: '#F7EEE3', fontWeight: '700', fontSize: 12 }
+});
