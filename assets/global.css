@@ -1,9 +1,0 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-
-/* Keep the app centred and constrained to the viewport on web. */
-html, body, #root { height: 100%; }
-body { margin: 0; background: #FBF7EF; }
-#root { display: flex; flex-direction: column; min-height: 0; }
-#root > div { min-height: 0; }
