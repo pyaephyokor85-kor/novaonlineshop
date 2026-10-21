@@ -6,12 +6,12 @@ module.exports = {
     extend: {
       colors: {
         nova: {
-          ink: '#2C2825',
-          cream: '#F8F6F1',
+          ink: '#102B62',
+          cream: '#FBF7EF',
           paper: '#FFFDF9',
-          sand: '#E9DFD1',
-          gold: '#D7AA7A',
-          clay: '#9B6E49',
+          sand: '#F0E7D4',
+          gold: '#D8B768',
+          clay: '#946D25',
           muted: '#958C83',
         },
       },

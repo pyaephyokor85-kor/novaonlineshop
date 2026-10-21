@@ -147,3 +147,7 @@ vite.config.ts.timestamp-*
 
 # Turbo Repo
 .turbo
+
+# Expo cache and private guest runtime profiles
+.expo/
+data/profiles/
