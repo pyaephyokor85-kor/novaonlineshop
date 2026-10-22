@@ -98,7 +98,11 @@ export default async function handler(req, res) {
     let fallback = true;
     const key = process.env.OPENAI_API_KEY;
     const base = (process.env.OPENAI_API_BASE || 'https://api.openai.com/v1').replace(/\/$/, '');
+    if (!key) {
+      console.warn('[scent-advisor] OpenAI fallback', { category: 'missing_key', code: 'OPENAI_KEY_MISSING', status: null });
+    }
     if (key && recommendations.length) {
+      let status = null;
       try {
         const model = process.env.LLM_MODEL || 'gpt-5-mini';
         const ranked = recommendations.map((x, i) => `${i + 1}. ${x.name} | ${x.family.join(', ')} | ${x.notes.join(', ')} | ${x.price}`).join('\n');
@@ -106,9 +110,23 @@ export default async function handler(req, res) {
         // reasoning_effort is accepted by reasoning models, but omitting it keeps custom/general models compatible.
         if (/^gpt-5(?:-|$)/i.test(model)) payload.reasoning_effort = 'low';
         const r = await fetch(`${base}/chat/completions`, { method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${key}` }, body: JSON.stringify(payload) });
+        status = Number.isInteger(r.status) && r.status >= 100 && r.status <= 599 ? r.status : null;
+        if (!r.ok) {
+          console.warn('[scent-advisor] OpenAI fallback', { category: 'http_error', code: 'OPENAI_HTTP_ERROR', status });
+        }
         const data = await r.json();
         if (r.ok && data.choices?.[0]?.message?.content) { reply = data.choices[0].message.content; fallback = false; }
-      } catch {}
+        else if (r.ok) {
+          console.warn('[scent-advisor] OpenAI fallback', { category: 'empty_response', code: 'OPENAI_CONTENT_MISSING', status });
+        }
+      } catch {
+        // Never log the error object, response body, request payload, headers, or key.
+        if (status === null) {
+          console.warn('[scent-advisor] OpenAI fallback', { category: 'request_failure', code: 'OPENAI_REQUEST_FAILED', status: null });
+        } else if (status < 400) {
+          console.warn('[scent-advisor] OpenAI fallback', { category: 'response_failure', code: 'OPENAI_RESPONSE_INVALID', status });
+        }
+      }
     }
     return res.status(200).json({ reply, profile, recommendations, seasonalContext: season, purchaseHistoryCount: purchaseHistory.length, fallback });
   } catch (error) { return res.status(500).json({ error: error.message || 'Advisor unavailable' }); }
