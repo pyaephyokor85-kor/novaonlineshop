@@ -97,9 +97,10 @@ export default async function handler(req, res) {
     let reply = fallbackReply(message, recommendations, season);
     let fallback = true;
     const key = process.env.NOVA_AI_AGENT || process.env.OPENAI_API_KEY;
+    const keySource = process.env.NOVA_AI_AGENT ? 'NOVA_AI_AGENT' : process.env.OPENAI_API_KEY ? 'OPENAI_API_KEY' : 'none';
     const base = (process.env.OPENAI_API_BASE || 'https://api.openai.com/v1').replace(/\/$/, '');
     if (!key) {
-      console.warn('[scent-advisor] OpenAI fallback', { category: 'missing_key', code: 'OPENAI_KEY_MISSING', status: null });
+      console.warn('[scent-advisor] OpenAI fallback', { category: 'missing_key', code: 'OPENAI_KEY_MISSING', status: null, keySource });
     }
     if (key && recommendations.length) {
       let status = null;
@@ -119,19 +120,19 @@ export default async function handler(req, res) {
             // Only accept a short machine-readable nested error code; never log other response data.
             const nestedCode = data?.error?.code;
             const openaiCode = typeof nestedCode === 'string' && nestedCode.length > 0 && nestedCode.length <= 64 && !/[^A-Za-z0-9_-]/.test(nestedCode) ? nestedCode : null;
-            console.warn('[scent-advisor] OpenAI fallback', { category: 'http_error', code: 'OPENAI_HTTP_ERROR', status, openaiCode });
+            console.warn('[scent-advisor] OpenAI fallback', { category: 'http_error', code: 'OPENAI_HTTP_ERROR', status, openaiCode, keySource });
           }
         }
         if (r.ok && data.choices?.[0]?.message?.content) { reply = data.choices[0].message.content; fallback = false; }
         else if (r.ok) {
-          console.warn('[scent-advisor] OpenAI fallback', { category: 'empty_response', code: 'OPENAI_CONTENT_MISSING', status });
+          console.warn('[scent-advisor] OpenAI fallback', { category: 'empty_response', code: 'OPENAI_CONTENT_MISSING', status, keySource });
         }
       } catch {
         // Never log the error object, response body, request payload, headers, or key.
         if (status === null) {
-          console.warn('[scent-advisor] OpenAI fallback', { category: 'request_failure', code: 'OPENAI_REQUEST_FAILED', status: null });
+          console.warn('[scent-advisor] OpenAI fallback', { category: 'request_failure', code: 'OPENAI_REQUEST_FAILED', status: null, keySource });
         } else if (status < 400) {
-          console.warn('[scent-advisor] OpenAI fallback', { category: 'response_failure', code: 'OPENAI_RESPONSE_INVALID', status });
+          console.warn('[scent-advisor] OpenAI fallback', { category: 'response_failure', code: 'OPENAI_RESPONSE_INVALID', status, keySource });
         }
       }
     }
