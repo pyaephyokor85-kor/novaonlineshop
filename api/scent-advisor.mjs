@@ -111,10 +111,17 @@ export default async function handler(req, res) {
         if (/^gpt-5(?:-|$)/i.test(model)) payload.reasoning_effort = 'low';
         const r = await fetch(`${base}/chat/completions`, { method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${key}` }, body: JSON.stringify(payload) });
         status = Number.isInteger(r.status) && r.status >= 100 && r.status <= 599 ? r.status : null;
-        if (!r.ok) {
-          console.warn('[scent-advisor] OpenAI fallback', { category: 'http_error', code: 'OPENAI_HTTP_ERROR', status });
+        let data;
+        try {
+          data = await r.json();
+        } finally {
+          if (!r.ok) {
+            // Only accept a short machine-readable nested error code; never log other response data.
+            const nestedCode = data?.error?.code;
+            const openaiCode = typeof nestedCode === 'string' && nestedCode.length > 0 && nestedCode.length <= 64 && !/[^A-Za-z0-9_-]/.test(nestedCode) ? nestedCode : null;
+            console.warn('[scent-advisor] OpenAI fallback', { category: 'http_error', code: 'OPENAI_HTTP_ERROR', status, openaiCode });
+          }
         }
-        const data = await r.json();
         if (r.ok && data.choices?.[0]?.message?.content) { reply = data.choices[0].message.content; fallback = false; }
         else if (r.ok) {
           console.warn('[scent-advisor] OpenAI fallback', { category: 'empty_response', code: 'OPENAI_CONTENT_MISSING', status });
