@@ -96,7 +96,7 @@ export default async function handler(req, res) {
     const season = seasonContext();
     let reply = fallbackReply(message, recommendations, season);
     let fallback = true;
-    const key = process.env.OPENAI_API_KEY;
+    const key = process.env.NOVA_AI_AGENT || process.env.OPENAI_API_KEY;
     const base = (process.env.OPENAI_API_BASE || 'https://api.openai.com/v1').replace(/\/$/, '');
     if (!key) {
       console.warn('[scent-advisor] OpenAI fallback', { category: 'missing_key', code: 'OPENAI_KEY_MISSING', status: null });
