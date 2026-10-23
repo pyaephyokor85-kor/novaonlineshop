@@ -105,7 +105,9 @@ export default async function handler(req, res) {
     if (key && recommendations.length) {
       let status = null;
       try {
-        const model = process.env.LLM_MODEL || 'gpt-5-mini';
+        const configuredModel = process.env.LLM_MODEL || 'gpt-5-mini';
+        // Normalize only this known autofilled alias; preserve all other model selections.
+        const model = configuredModel === 'gtp-5-mini' ? 'gpt-5-mini' : configuredModel;
         const ranked = recommendations.map((x, i) => `${i + 1}. ${x.name} | ${x.family.join(', ')} | ${x.notes.join(', ')} | ${x.price}`).join('\n');
         const payload = { model, max_completion_tokens: 500, messages: [{ role: 'system', content: `You are NOVA perfume advisor. Recommend only these non-blocked ranked products and reply in the user's language, under 100 words:\n${ranked}` }, ...conversationHistory, { role: 'user', content: message }] };
         // reasoning_effort is accepted by reasoning models, but omitting it keeps custom/general models compatible.
