@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { processOrderNotification } from './lib/order-notification.mjs';
+import { processAdminRequest, processPublicDiscountRequest } from './lib/order-management.mjs';
 import scentAdvisorHandler from './api/scent-advisor.mjs';
 
 const port = Number(process.env.PORT || 8787);
@@ -88,6 +89,15 @@ const server = http.createServer(async (req, res) => {
   if (match && req.method === 'POST') { try { const body = await readBody(req); const profile = { ...readProfile(match[1]), ...(body.profile || {}) }; saveProfile(match[1], profile); return json(res, 200, { profile }); } catch (e) { return json(res, 400, { error: e.message }); } }
   if (req.url === '/api/cloud-purchases' && req.method === 'GET') { try { const auth = await authenticatedSupabaseUser(req); if (auth.error) return json(res, auth.status, { error: auth.error }); const r = await fetch(`${supabaseUrl}/rest/v1/fragrance_purchases?select=product_id,purchased_at,quantity,price&order=purchased_at.desc`, { headers: { apikey: supabaseKey, Authorization: `Bearer ${auth.token}` } }); const data = await r.json().catch(() => ({})); return json(res, r.ok ? 200 : r.status, r.ok ? { purchases: data } : { error: data.message || 'Supabase purchase history read failed' }); } catch (e) { return json(res, 502, { error: e.message }); } }
   if (req.url === '/api/cloud-purchases' && req.method === 'POST') { try { const auth = await authenticatedSupabaseUser(req); if (auth.error) return json(res, auth.status, { error: auth.error }); const body = await readBody(req); const purchase = body.purchase || {}; if (!catalogProducts.some(x => x.id === String(purchase.productId || purchase.product_id))) return json(res, 400, { error: 'Unknown NOVA product' }); const row = { user_id: auth.user.id, product_id: String(purchase.productId || purchase.product_id), purchased_at: purchase.purchasedAt || purchase.purchased_at || new Date().toISOString(), quantity: Math.max(1, Number(purchase.quantity || 1)), price: purchase.price || null }; const r = await fetch(`${supabaseUrl}/rest/v1/fragrance_purchases`, { method: 'POST', headers: { apikey: supabaseKey, Authorization: `Bearer ${auth.token}`, 'Content-Type': 'application/json', Prefer: 'return=representation' }, body: JSON.stringify(row) }); const data = await r.json().catch(() => ({})); return json(res, r.ok ? 201 : r.status, r.ok ? { purchase: data[0] || row } : { error: data.message || 'Supabase purchase history write failed' }); } catch (e) { return json(res, 502, { error: e.message }); } }
+  if (req.url === '/api/current-discount') { const result = await processPublicDiscountRequest({ method: req.method }); return json(res, result.status, result.body); }
+  const adminMatch = req.url?.match(/^\/api\/admin\/(orders|inventory|discount)$/);
+  if (adminMatch) {
+    try {
+      const body = req.method === 'POST' ? await readBody(req) : undefined;
+      const result = await processAdminRequest({ method: req.method, headers: req.headers, body }, { resource: adminMatch[1] });
+      return json(res, result.status, result.body);
+    } catch (error) { return json(res, error.statusCode || 400, { error: error.message || 'Admin request failed.' }); }
+  }
   if (req.url === '/api/order-notification') {
     try {
       const body = req.method === 'POST' ? await readBody(req) : {};

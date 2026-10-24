@@ -5,6 +5,7 @@ import { createClient } from '@supabase/supabase-js';
 import { Image, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import './global.css';
+import AdminRoute from './AdminRoute';
 import { novaCatalog } from './data/nova-catalog';
 import shopPricing from './data/shop-pricing.json';
 type BottleSize = keyof typeof shopPricing.sizes;
@@ -252,10 +253,20 @@ function Detail({ p, close }: { p: Product; close: () => void }) {
   const [size, setSize] = useState<BottleSize | null>(null);
   const [sending, setSending] = useState(false); const sendingRef = useRef(false);
   const [orderStatus, setOrderStatus] = useState('');
+  const [discountOffer, setDiscountOffer] = useState({ enabled: false, percent: 0 });
+  const idempotencyKeyRef = useRef('');
+  useEffect(() => {
+    let active = true;
+    (async () => { try { if (Platform.OS !== 'web' && !API_URL) return; const response = await fetch(apiEndpoint('/api/current-discount')); if (!response.ok) return; const setting = await response.json(); if (active && setting.enabled === true && Number.isFinite(Number(setting.percent))) setDiscountOffer({ enabled: true, percent: Math.max(0, Math.min(100, Number(setting.percent))) }); } catch { /* Keep the safe no-discount estimate if Preview settings are unavailable. */ } })();
+    return () => { active = false; };
+  }, []);
   const amount = Number(quantity);
   const validQuantity = Number.isInteger(amount) && amount >= 1 && amount <= 99;
   const unitPrice = size ? shopPricing.sizes[size] : null;
   const total = unitPrice !== null && validQuantity ? unitPrice * amount : null;
+  const discountPercent = discountOffer.enabled ? discountOffer.percent : 0;
+  const discountAmount = total === null ? null : Math.round(total * discountPercent / 100);
+  const codTotal = total === null || discountAmount === null ? null : total - discountAmount;
   const submitOrder = async () => {
     if (sendingRef.current) return;
     setOrderStatus('');
@@ -264,13 +275,19 @@ function Detail({ p, close }: { p: Product; close: () => void }) {
     if (!name.trim() || !phone.trim() || !address.trim()) { setOrderStatus('အမည်၊ ဖုန်းနံပါတ်နဲ့ ပို့ရမယ့်လိပ်စာ ဖြည့်ပေးပါ။'); return; }
     sendingRef.current = true; setSending(true);
     try {
-      const res = await fetch(apiEndpoint('/api/order-notification'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ customerName: name.trim(), phone: phone.trim(), address: address.trim(), quantity: amount, size, paymentMethod: shopPricing.paymentMethod, product: { id: p.id } }) });
+      if (!idempotencyKeyRef.current) idempotencyKeyRef.current = `NOVA_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+      const res = await fetch(apiEndpoint('/api/order-notification'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ customerName: name.trim(), phone: phone.trim(), address: address.trim(), quantity: amount, size, paymentMethod: shopPricing.paymentMethod, idempotencyKey: idempotencyKeyRef.current, product: { id: p.id } }) });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || data.ok !== true) {
         setOrderStatus(res.status === 503 ? 'အော်ဒါလက်ခံစနစ် မချိတ်ဆက်ရသေးပါ။ အော်ဒါ မပို့ရသေးပါ။' : 'အော်ဒါပို့မှုကို အတည်မပြုနိုင်သေးပါ။ ချက်ချင်း ထပ်မပို့ဘဲ ဆိုင်နှင့် အတည်ပြုပေးပါ။');
         return;
       }
-      setOrderStatus('အော်ဒါတောင်းဆိုချက် ပို့ပြီးပါပြီ။ ပစ္စည်းရရှိမှုနဲ့ ပို့ခကို ဆိုင်က ဆက်သွယ်အတည်ပြုပေးပါမယ်။ COD — အိမ်ရောက်ငွေချေပါ။');
+      if (data.orderNumber) {
+        const discountText = Number(data.discountAmount) > 0 ? ` Discount ${data.discountPercent}%: −${money(Number(data.discountAmount))}.` : '';
+        const notificationText = data.notificationSent === false && !data.duplicate ? ' The order is saved in the Preview queue, but its Telegram notice was not sent.' : '';
+        setOrderStatus(`Order ${data.orderNumber} received. Subtotal ${money(Number(data.subtotal))}.${discountText} COD merchandise total ${money(Number(data.total))}; delivery fee is separate.${notificationText}`);
+      } else setOrderStatus('အော်ဒါတောင်းဆိုချက် ပို့ပြီးပါပြီ။ ပစ္စည်းရရှိမှုနဲ့ ပို့ခကို ဆိုင်က ဆက်သွယ်အတည်ပြုပေးပါမယ်။ COD — အိမ်ရောက်ငွေချေပါ။');
+      idempotencyKeyRef.current = '';
       setName(''); setPhone(''); setAddress(''); setQuantity('1'); setSize(null);
     } catch {
       setOrderStatus('ပို့မှုအခြေအနေကို အတည်မပြုနိုင်သေးပါ။ ထပ်မပို့ခင် ဆိုင်နှင့် စစ်ဆေးပေးပါ။');
@@ -296,7 +313,9 @@ function Detail({ p, close }: { p: Product; close: () => void }) {
     <View style={[field, { marginTop: 16 }]}>
       <Text>{p.id} — {p.name}</Text>
       <Text style={{ marginTop: 8 }}>{size ? `${size} · ${money(unitPrice!)} × ${validQuantity ? amount : '—'}` : 'အရွယ်အစား ရွေးပေးပါ။'}</Text>
-      <Text accessibilityLiveRegion="polite" style={{ color: '#102B62', fontSize: 17, fontWeight: '700', marginTop: 10 }}>ကုန်ပစ္စည်းစုစုပေါင်း: {total === null ? '—' : money(total)}</Text>
+      <Text style={{ marginTop: 8 }}>ကုန်ပစ္စည်းစုစုပေါင်း: {total === null ? '—' : money(total)}</Text>
+      {discountPercent > 0 && discountAmount !== null ? <Text style={{ marginTop: 6, color: '#355F3C' }}>လျှော့ဈေး ({discountPercent}%): −{money(discountAmount)}</Text> : null}
+      <Text accessibilityLiveRegion="polite" style={{ color: '#102B62', fontSize: 17, fontWeight: '700', marginTop: 8 }}>COD ပစ္စည်းစုစုပေါင်း: {codTotal === null ? '—' : money(codTotal)}</Text>
       <Text style={{ marginTop: 8 }}>{shopPricing.paymentLabel}</Text>
       <Text style={{ marginTop: 8, lineHeight: 22 }}>ပို့ခ မပါသေးပါ။ ပစ္စည်းရရှိမှုနဲ့ ပို့ခကို ဆိုင်က ဆက်သွယ်အတည်ပြုပြီးမှ ပို့ပေးပါမယ်။</Text>
     </View>
@@ -304,7 +323,7 @@ function Detail({ p, close }: { p: Product; close: () => void }) {
     {orderStatus ? <Text accessibilityRole="alert" style={{ color: '#80583D', marginTop: 12, lineHeight: 22 }}>{orderStatus}</Text> : null}
   </ScrollView></SafeAreaView>;
 }
-function NovaApp() {
+function StorefrontApp() {
   const [tab, setTab] = useState<Tab>('home');
   const [selected, setSelected] = useState<Product | null>(null);
   const [session, setSession] = useState<string | null>(null);
@@ -328,7 +347,8 @@ function NovaApp() {
  if (booting) return <SafeAreaView style={s.auth}><StatusBar style="dark" /></SafeAreaView>; const screen = tab === 'home' ? <Home go={setTab} pick={setSelected} /> : tab === 'discover' ? <Discover pick={setSelected} /> : tab === 'advisor' ? <Advisor pick={setSelected} /> : !session ? <AuthScreen onAuth={setSession} /> : <Profile onSignOut={async () => { if (supabase) await supabase.auth.signOut(); await AsyncStorage.removeItem('@nova/local-session'); setTab('home'); setSelected(null); setSession(null); }} />; return <SafeAreaView style={s.app}><StatusBar style="dark" />{screen}<View style={s.nav}>{([['home', '⌂', 'Home'], ['discover', '◒', 'Discover'], ['advisor', '✦', 'Advisor'], ['profile', '○', 'Profile']] as const).map(([key, icon, label]) => <Pressable key={key} onPress={() => setTab(key)} style={s.navItem}><Text style={[s.navIcon, tab === key && s.navActive]}>{icon}</Text><Text style={[s.navLabel, tab === key && s.navActive]}>{label}</Text></Pressable>)}</View><Modal visible={Boolean(selected)} animationType="slide" onRequestClose={() => {}}>{selected ? <Detail key={selected.id} p={selected} close={() => setSelected(null)} /> : null}</Modal></SafeAreaView>; }
 
 export default function App() {
-  return <SafeAreaProvider><NovaApp /></SafeAreaProvider>;
+  const isAdminRoute = Platform.OS === 'web' && typeof window !== 'undefined' && window.location.pathname.replace(/\/+$/, '') === '/admin';
+  return <SafeAreaProvider>{isAdminRoute ? <AdminRoute /> : <StorefrontApp />}</SafeAreaProvider>;
 }
 
 const s = StyleSheet.create({
