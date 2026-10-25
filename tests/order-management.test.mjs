@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { validateIdempotencyKey, validateStatusTransition, processAdminRequest, processPublicDiscountRequest } from '../lib/order-management.mjs';
 import { buildAddressLabelHtml, buildReceiptHtml } from '../lib/print-templates.mjs';
 
-const env = { NOVA_ORDER_STORAGE_ENABLED: 'true', SUPABASE_URL: 'https://preview.example.test', SUPABASE_SERVICE_ROLE_KEY: 'server-only-test-key', NOVA_ADMIN_EMAILS: 'owner@example.test' };
+const env = { NOVA_ORDER_STORAGE_ENABLED: 'true', EXPO_PUBLIC_NOVA_PREVIEW_SUPABASE_URL: 'https://preview.example.test', NOVA_PREVIEW_SUPABASE_SERVICE_ROLE_KEY: 'server-only-test-key', SUPABASE_URL: 'https://production.example.test', SUPABASE_SERVICE_ROLE_KEY: 'production-server-key', NOVA_ADMIN_EMAILS: 'owner@example.test' };
 const headers = { authorization: 'Bearer staff-token' };
 const jsonResponse = (data, ok = true) => ({ ok, json: async () => data });
 
@@ -20,6 +20,15 @@ test('admin endpoints fail closed when Preview storage is disabled or credential
   const disabled = await processAdminRequest({ method: 'GET', headers }, { resource: 'orders', env: { ...env, NOVA_ORDER_STORAGE_ENABLED: 'false' } });
   const missing = await processAdminRequest({ method: 'GET', headers }, { resource: 'orders', env: { NOVA_ORDER_STORAGE_ENABLED: 'true' } });
   assert.equal(disabled.status, 503); assert.equal(missing.status, 503);
+});
+
+test('admin storage prefers unique Preview URL and server-only key over legacy values', async () => {
+  const requests = [];
+  const result = await processAdminRequest({ method: 'GET', headers }, { resource: 'orders', env, fetchImpl: async (url, options) => { requests.push({ url, options }); return url.endsWith('/auth/v1/user') ? jsonResponse({ id: 'staff-id', email: 'owner@example.test' }) : jsonResponse([]); } });
+  assert.equal(result.status, 200);
+  assert.equal(requests.length, 2);
+  assert.ok(requests.every(({ url }) => url.startsWith('https://preview.example.test/')));
+  assert.equal(requests[0].options.headers.apikey, 'server-only-test-key');
 });
 
 test('public discount endpoint safely defaults off without Preview configuration', async () => {
