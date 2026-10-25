@@ -19,8 +19,8 @@ type Message = { id: string; from: 'nova' | 'user'; text: string; recommendation
 type FragranceProfile = { favoriteFamilies: string[]; preferredNotes: string[]; moods: string[]; occasions: string[]; dislikes: string[]; lastRecommendation?: string; updatedAt?: string };
 const emptyProfile: FragranceProfile = { favoriteFamilies: [], preferredNotes: [], moods: [], occasions: [], dislikes: [] };
 const PROFILE_ID_KEY = '@nova/fragrance-profile-id';
-const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL || '';
-const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
+const SUPABASE_URL = process.env.EXPO_PUBLIC_NOVA_PREVIEW_SUPABASE_URL || process.env.EXPO_PUBLIC_SUPABASE_URL || '';
+const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_NOVA_PREVIEW_SUPABASE_ANON_KEY || process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
 const supabase = SUPABASE_URL && SUPABASE_ANON_KEY ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { storage: AsyncStorage, autoRefreshToken: true, persistSession: true, detectSessionInUrl: false } }) : null;
 const getProfileId = async () => {
   const user = supabase ? (await supabase.auth.getSession()).data.session?.user : null;

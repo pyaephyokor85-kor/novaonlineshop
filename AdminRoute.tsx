@@ -5,8 +5,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import AdminConsole from './AdminConsole';
 import AdminLogin from './AdminLogin';
 
-const url = process.env.EXPO_PUBLIC_SUPABASE_URL || '';
-const anonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
+const url = process.env.EXPO_PUBLIC_NOVA_PREVIEW_SUPABASE_URL || process.env.EXPO_PUBLIC_SUPABASE_URL || '';
+const anonKey = process.env.EXPO_PUBLIC_NOVA_PREVIEW_SUPABASE_ANON_KEY || process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
 const client = url && anonKey ? createClient(url, anonKey, { auth: { storage: AsyncStorage, autoRefreshToken: true, persistSession: true, detectSessionInUrl: false } }) : null;
 
 export default function AdminRoute() {
