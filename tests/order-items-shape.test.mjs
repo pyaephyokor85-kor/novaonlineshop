@@ -21,8 +21,10 @@ test('orders API normalizes the one-to-one item object for queue rendering and 8
   for (const width of [80, 110]) {
     const receipt = buildReceiptHtml(order, width);
     const label = buildAddressLabelHtml(order, width);
-    assert.match(receipt, new RegExp(`size:${width}mm auto`));
-    assert.match(label, new RegExp(`size:${width}mm 100mm`));
+    assert.match(receipt, new RegExp(`@page\\{size:${width}mm ${width}mm;margin:0\\}`));
+    assert.match(receipt, new RegExp(`pageSize\\.textContent = '@page\\{size:${width}mm '\\s*\\+ pageHeightMm`));
+    assert.match(label, new RegExp(`@page\\{size:${width}mm 100mm;margin:0\\}`));
+    assert.doesNotMatch(receipt, /@page\{size:\d+mm auto;/);
     assert.match(receipt, /Fake Preview Scent/);
     assert.match(receipt, /10ml/);
     assert.match(receipt, /13,500 Ks/);
