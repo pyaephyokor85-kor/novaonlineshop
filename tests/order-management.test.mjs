@@ -36,10 +36,22 @@ test('public discount endpoint safely defaults off without Preview configuration
   assert.equal(result.status, 200); assert.deepEqual(result.body, { enabled: false, percent: 0 });
 });
 
-test('print receipt renders immutable subtotal, discount and COD total at 110mm; label uses 80mm and escapes input', () => {
+test('print templates use valid thermal dimensions at 80mm and 110mm and preserve COD contents', () => {
   const order = { id: 'id', order_number: 'NOVA-TEST', status: 'waiting', customer_name: '<script>', phone: '09', address: 'Yangon & Mandalay', created_at: '2026-10-24T00:00:00Z', subtotal: 70000, discount_percent: 10, discount_amount: 7000, total: 63000, payment_method: 'COD', nova_order_items: [{ product_id: 'NV-001', product_name: 'Blue Essence', size: '30ml', unit_price: 35000, quantity: 2, line_total: 70000 }] };
   const receipt = buildReceiptHtml(order, 110); const label = buildAddressLabelHtml(order, 80);
-  assert.match(receipt, /size:110mm auto/); assert.match(label, /size:80mm 100mm/);
+  assert.match(receipt, /@page\{size:110mm 110mm;margin:0\}/);
+  assert.match(receipt, /pageSize\.textContent = '@page\{size:110mm ' \+ pageHeightMm \+ 'mm;margin:0\}'/);
+  assert.match(label, /@page\{size:80mm 100mm;margin:0\}/);
   assert.match(receipt, /30ml/); assert.match(receipt, /Merchandise subtotal/); assert.match(receipt, /Discount \(10%\)/); assert.match(receipt, /−7,000 Ks/); assert.match(receipt, /63,000 Ks/); assert.match(receipt, /Delivery fee is not included/);
   assert.match(receipt, /&lt;script&gt;/); assert.match(label, /Yangon &amp; Mandalay/); assert.doesNotMatch(receipt, /<b>Customer:<\/b>\s*<script>/);
+
+  for (const width of [80, 110]) {
+    const widthReceipt = buildReceiptHtml(order, width);
+    const widthLabel = buildAddressLabelHtml(order, width);
+    assert.match(widthReceipt, new RegExp(`@page\\{size:${width}mm ${width}mm;margin:0\\}`));
+    assert.match(widthReceipt, new RegExp(`pageSize\\.textContent = '@page\\{size:${width}mm '\\s*\\+ pageHeightMm`));
+    assert.match(widthLabel, new RegExp(`@page\\{size:${width}mm 100mm;margin:0\\}`));
+    assert.doesNotMatch(widthReceipt, /@page\{size:\d+mm auto;/);
+    assert.doesNotMatch(widthLabel, /@page\{size:\d+mm auto;/);
+  }
 });
