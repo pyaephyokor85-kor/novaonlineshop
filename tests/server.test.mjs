@@ -9,7 +9,7 @@ before(async () => {
   const port = 18000 + Math.floor(Math.random() * 1000);
   child = spawn(process.execPath, ['server.mjs'], {
     cwd: new URL('..', import.meta.url),
-    env: { ...process.env, PORT: String(port), OPENAI_API_KEY: '', ANTHROPIC_API_KEY: '', TELEGRAM_BOT_TOKEN: '', TELEGRAM_CHAT_ID: '', NOVA_ORDER_STORAGE_ENABLED: 'false', SUPABASE_URL: '', SUPABASE_ANON_KEY: '', EXPO_PUBLIC_SUPABASE_URL: '', EXPO_PUBLIC_SUPABASE_ANON_KEY: '', EXPO_PUBLIC_NOVA_PREVIEW_SUPABASE_URL: 'https://preview.example.test', EXPO_PUBLIC_NOVA_PREVIEW_SUPABASE_ANON_KEY: 'preview-anon-test-key', SUPABASE_SERVICE_ROLE_KEY: '', NOVA_ADMIN_EMAILS: '' },
+    env: { ...process.env, PORT: String(port), OPENAI_API_KEY: '', ANTHROPIC_API_KEY: '', TELEGRAM_BOT_TOKEN: '', TELEGRAM_CHAT_ID: '', NOVA_ORDER_STORAGE_ENABLED: 'false', NOVA_THERMER_PRINT_ENABLED: 'false', NOVA_PRINT_TOKEN_SECRET: '', NOVA_PREVIEW_SUPABASE_SERVICE_ROLE_KEY: '', SUPABASE_URL: '', SUPABASE_ANON_KEY: '', EXPO_PUBLIC_SUPABASE_URL: '', EXPO_PUBLIC_SUPABASE_ANON_KEY: '', EXPO_PUBLIC_NOVA_PREVIEW_SUPABASE_URL: 'https://preview.example.test', EXPO_PUBLIC_NOVA_PREVIEW_SUPABASE_ANON_KEY: 'preview-anon-test-key', SUPABASE_SERVICE_ROLE_KEY: '', NOVA_ADMIN_EMAILS: '' },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   child.stdout.on('data', () => {});
@@ -65,6 +65,25 @@ test('admin routes fail closed without the Preview storage flag', async () => {
     const response = await fetch(`${base}/api/admin/${resource}`);
     assert.equal(response.status, 503);
     assert.match((await response.json()).error, /disabled/);
+  }
+});
+
+test('Thermer routes fail closed with private UTF-8/no-store headers and no CORS, including preflight and invalid JSON', async () => {
+  for (const [path, method, body, status] of [
+    ['/api/admin/print-ticket', 'POST', JSON.stringify({ orderId: '00000000-0000-4000-8000-000000000001' }), 503],
+    ['/api/print-response?token=invalid', 'GET', undefined, 503],
+    ['/api/admin/print-ticket', 'OPTIONS', undefined, 405],
+    ['/api/print-response', 'POST', undefined, 405],
+    ['/api/admin/print-ticket', 'POST', '{', 400],
+  ]) {
+    const response = await fetch(`${base}${path}`, { method, body, headers: { 'content-type': 'application/json', origin: 'https://untrusted.example' } });
+    assert.equal(response.status, status);
+    assert.match(response.headers.get('content-type'), /application\/json; charset=utf-8/);
+    assert.match(response.headers.get('cache-control'), /no-store/);
+    assert.equal(response.headers.get('x-content-type-options'), 'nosniff');
+    assert.equal(response.headers.get('referrer-policy'), 'no-referrer');
+    assert.equal(response.headers.get('access-control-allow-origin'), null);
+    assert.ok((await response.json()).error);
   }
 });
 
