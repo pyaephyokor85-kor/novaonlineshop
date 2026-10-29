@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { processOrderNotification } from './lib/order-notification.mjs';
 import { processAdminRequest, processPublicDiscountRequest } from './lib/order-management.mjs';
 import scentAdvisorHandler from './api/scent-advisor.mjs';
+import { processThermerTicketRequest, processThermerResponseRequest, THERMER_RESPONSE_HEADERS } from './lib/thermer-print.mjs';
 
 const port = Number(process.env.PORT || 8787);
 const provider = (process.env.LLM_PROVIDER || 'openai').toLowerCase();
@@ -24,6 +25,7 @@ fs.mkdirSync(profileDir, { recursive: true });
 const catalogProducts = JSON.parse(fs.readFileSync(path.join(dataDir, 'nova-catalog.json'), 'utf8'));
 
 function json(res, status, body) { res.writeHead(status, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'Content-Type, Authorization', 'Access-Control-Allow-Methods': 'GET,POST,PUT,OPTIONS' }); res.end(JSON.stringify(body)); }
+function printJson(res, status, body) { res.writeHead(status, THERMER_RESPONSE_HEADERS); res.end(JSON.stringify(body)); }
 function readBody(req) {
   return new Promise((resolve, reject) => {
     let chunks = []; let size = 0; let settled = false;
@@ -80,6 +82,15 @@ async function writeCloudProfile(req, profile) {
 function readProfile(id) { try { return { ...emptyProfile, ...JSON.parse(fs.readFileSync(profileFile(id), 'utf8')) }; } catch { return { ...emptyProfile }; } }
 function saveProfile(id, profile) { fs.writeFileSync(profileFile(id), JSON.stringify({ ...profile, updatedAt: new Date().toISOString() }, null, 2)); }
 const server = http.createServer(async (req, res) => {
+  const printPath = String(req.url || '').split('?')[0];
+  if (printPath === '/api/admin/print-ticket' || printPath === '/api/print-response') {
+    try {
+      const body = printPath === '/api/admin/print-ticket' && req.method === 'POST' ? await readBody(req) : undefined;
+      const request = { method: req.method, url: req.url, headers: req.headers, body };
+      const result = printPath === '/api/admin/print-ticket' ? await processThermerTicketRequest(request) : await processThermerResponseRequest(request);
+      return printJson(res, result.status, result.body);
+    } catch (error) { return printJson(res, error.statusCode || 400, { error: error.message || 'Preview print request failed.' }); }
+  }
   if (req.method === 'OPTIONS') return json(res, 204, {});
   if (req.method === 'GET' && req.url === '/health') return json(res, 200, { ok: true, provider, model, memory: 'file-backed', supabase: Boolean(supabaseUrl && supabaseKey), catalogSize: catalogProducts.length });
   if (req.url === '/api/cloud-profile' && req.method === 'GET') { try { const result = await readCloudProfile(req); return json(res, result.error ? result.status : 200, result.error ? { error: result.error } : { profile: result.profile, user: { id: result.user.id, email: result.user.email } }); } catch (e) { return json(res, 502, { error: e.message }); } }
