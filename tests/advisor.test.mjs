@@ -32,7 +32,7 @@ test('handler returns a generic fallback when every catalog product is blocked',
   if (oldKey === undefined) delete process.env.OPENAI_API_KEY; else process.env.OPENAI_API_KEY = oldKey;
   assert.equal(res.statusCode, 200);
   assert.deepEqual(res.body.recommendations, []);
-  assert.match(res.body.reply, /Tell me more/);
+  assert.match(res.body.reply, /Tell me another scent preference/);
 });
 
 test('LLM request contains only nonblocked products and compatible reasoning option', async () => {
@@ -42,7 +42,7 @@ test('LLM request contains only nonblocked products and compatible reasoning opt
   let request;
   globalThis.fetch = async (_url, options) => {
     request = JSON.parse(options.body);
-    return { ok: true, async json() { return { choices: [{ message: { content: 'ok' } }] }; } };
+    return { ok: true, async json() { return { choices: [{ message: { content: JSON.stringify({ reply: 'Try this fresh scent.', recommendationIds: ['NV-003'] }) } }] }; } };
   };
   try {
     const res = makeRes();
@@ -51,7 +51,7 @@ test('LLM request contains only nonblocked products and compatible reasoning opt
     assert.equal(res.body.fallback, false);
     assert.equal(request.reasoning_effort, 'low');
     assert.equal(request.reasoning, undefined);
-    assert.ok(request.messages[0].content.includes('non-blocked'));
+    assert.ok(request.messages[0].content.includes('Eligible catalog'));
     assert.deepEqual(request.messages.slice(1, 3).map(message => message.content), ['I want something warm', 'I can help']);
     assert.ok(!request.messages[0].content.toLowerCase().includes('oud |'));
   } finally {
