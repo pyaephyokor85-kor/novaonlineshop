@@ -32,7 +32,12 @@ export default function AdminConsole({ onSignOut, authClient }: { onSignOut: () 
   const [discountSetting, setDiscountSetting] = useState<DiscountSetting>({ enabled: false, percent: 0 });
   const [discountEnabled, setDiscountEnabled] = useState(false);
   const [discountPercent, setDiscountPercent] = useState('0');
-  const [section, setSection] = useState<'orders' | 'stock' | 'discount'>('orders');
+  const [section, setSection] = useState<'orders' | 'stock' | 'discount' | 'showcase'>('orders');
+  const [showcaseTitle, setShowcaseTitle] = useState('');
+  const [showcaseDescription, setShowcaseDescription] = useState('');
+  const [showcaseImage, setShowcaseImage] = useState('');
+  const [showcaseCta, setShowcaseCta] = useState<'discover' | 'advisor'>('discover');
+  const [showcaseEnabled, setShowcaseEnabled] = useState(false);
   const [width, setWidth] = useState<80 | 110>(80);
   const [loading, setLoading] = useState(true);
   const [working, setWorking] = useState('');
@@ -65,6 +70,11 @@ export default function AdminConsole({ onSignOut, authClient }: { onSignOut: () 
     try {
       const [orderData, stockData, discountData] = await Promise.all([api('/api/admin/orders'), api('/api/admin/inventory'), api('/api/admin/discount')]);
       setOrders(orderData.orders || []);
+      try {
+        const showcase = await api('/api/admin/showcase');
+        const board = showcase.board;
+        if (board) { setShowcaseTitle(board.title || ''); setShowcaseDescription(board.description || ''); setShowcaseImage(board.image_url || ''); setShowcaseCta(board.cta || 'discover'); setShowcaseEnabled(Boolean(board.enabled)); }
+      } catch { /* Display board may not be initialized yet. */ }
       setInventory(stockData.inventory || []);
       setAdjustments(stockData.adjustments || []);
       const setting = discountData.setting || { enabled: false, percent: 0 };
@@ -104,6 +114,14 @@ export default function AdminConsole({ onSignOut, authClient }: { onSignOut: () 
     catch (problem: any) { setError(problem?.message || 'Discount settings were not saved.'); }
     finally { setWorking(''); }
   };
+  const saveShowcase = async () => {
+    setWorking('showcase'); setError(''); setNotice('');
+    try {
+      await api('/api/admin/showcase', 'POST', { action: 'save', title: showcaseTitle, description: showcaseDescription, image_url: showcaseImage, cta: showcaseCta, enabled: showcaseEnabled });
+      setNotice('Live Showcase saved. Customer screens refresh within 30 seconds.');
+    } catch (problem: any) { setError(problem?.message || 'Could not save showcase.'); }
+    finally { setWorking(''); }
+  };
   const print = (order: Order, kind: 'receipt' | 'label') => {
     if (Platform.OS !== 'web' || typeof window === 'undefined') { setError('Printing is available in the web Preview.'); return; }
     const popup = window.open('', '_blank', 'width=600,height=800');
@@ -134,10 +152,20 @@ export default function AdminConsole({ onSignOut, authClient }: { onSignOut: () 
   };
 
   return <SafeAreaView style={styles.root}><View style={styles.header}><View><Text style={styles.kicker}>NOVA · PRIVATE PREVIEW</Text><Text style={styles.title}>Shop admin</Text></View><Pressable onPress={onSignOut} style={styles.signOut}><Text style={styles.signOutText}>Sign out</Text></Pressable></View>
-    <View style={styles.tabs}><Pressable onPress={() => setSection('orders')} style={[styles.tab, section === 'orders' && styles.tabOn]}><Text style={[styles.tabText, section === 'orders' && styles.tabTextOn]}>Orders</Text></Pressable><Pressable onPress={() => setSection('stock')} style={[styles.tab, section === 'stock' && styles.tabOn]}><Text style={[styles.tabText, section === 'stock' && styles.tabTextOn]}>Stock / ml</Text></Pressable><Pressable onPress={() => setSection('discount')} style={[styles.tab, section === 'discount' && styles.tabOn]}><Text style={[styles.tabText, section === 'discount' && styles.tabTextOn]}>Discount</Text></Pressable></View>
+    <View style={styles.tabs}><Pressable onPress={() => setSection('orders')} style={[styles.tab, section === 'orders' && styles.tabOn]}><Text style={[styles.tabText, section === 'orders' && styles.tabTextOn]}>Orders</Text></Pressable><Pressable onPress={() => setSection('stock')} style={[styles.tab, section === 'stock' && styles.tabOn]}><Text style={[styles.tabText, section === 'stock' && styles.tabTextOn]}>Stock / ml</Text></Pressable><Pressable onPress={() => setSection('discount')} style={[styles.tab, section === 'discount' && styles.tabOn]}><Text style={[styles.tabText, section === 'discount' && styles.tabTextOn]}>Discount</Text></Pressable><Pressable onPress={() => setSection('showcase')} style={[styles.tab, section === 'showcase' && styles.tabOn]}><Text style={[styles.tabText, section === 'showcase' && styles.tabTextOn]}>Live Board</Text></Pressable></View>
     {section === 'orders' ? <View style={styles.toolbar}><Text style={styles.help}>Browser print width</Text>{([80, 110] as const).map(value => <Pressable key={value} onPress={() => setWidth(value)} style={[styles.widthButton, width === value && styles.widthOn]}><Text style={[styles.widthText, width === value && styles.widthTextOn]}>{value} mm</Text></Pressable>)}</View> : null}
     {loading ? <Text style={styles.message}>Loading Preview data…</Text> : <ScrollView contentContainerStyle={styles.content}>
       {error ? <Text accessibilityRole="alert" style={styles.error}>{error}</Text> : null}{notice ? <Text accessibilityLiveRegion="polite" style={styles.notice}>{notice}</Text> : null}
+      {section === 'showcase' ? <View style={{ gap: 12, backgroundColor: '#FFFFFF', borderRadius: 14, padding: 16 }}>
+        <Text style={styles.sectionTitle}>Home Live Display Board</Text>
+        <Text style={styles.help}>Publish updates to the Preview home screen (refreshes within 30 seconds).</Text>
+        <Text>Title</Text><TextInput style={{ borderWidth: 1, borderColor: '#DCD6CA', borderRadius: 9, padding: 11, color: '#102856' }} value={showcaseTitle} onChangeText={setShowcaseTitle} maxLength={90} placeholder="New at NOVA" />
+        <Text>Description</Text><TextInput style={{ borderWidth: 1, borderColor: '#DCD6CA', borderRadius: 9, padding: 11, color: '#102856' }} value={showcaseDescription} onChangeText={setShowcaseDescription} multiline maxLength={500} placeholder="Describe the collection" />
+        <Text>Image HTTPS URL (optional — use a real NOVA product photo)</Text><TextInput style={{ borderWidth: 1, borderColor: '#DCD6CA', borderRadius: 9, padding: 11, color: '#102856' }} value={showcaseImage} onChangeText={setShowcaseImage} autoCapitalize="none" placeholder="https://..." />
+        <View style={{ flexDirection: 'row', gap: 10, flexWrap: 'wrap' }}><PrintButton title={showcaseCta === 'discover' ? '✓ Explore Scents' : 'Explore Scents'} onPress={() => setShowcaseCta('discover')} /><PrintButton title={showcaseCta === 'advisor' ? '✓ Ask Adviser' : 'Ask Adviser'} onPress={() => setShowcaseCta('advisor')} /></View>
+        <View style={{ flexDirection: 'row', gap: 10 }}><PrintButton title={showcaseEnabled ? '✓ Published' : 'Publish board'} onPress={() => setShowcaseEnabled(true)} /><PrintButton title={!showcaseEnabled ? '✓ Hidden' : 'Hide board'} onPress={() => setShowcaseEnabled(false)} /></View>
+        <PrintButton title={working === 'showcase' ? 'Saving...' : 'Save Live Board'} disabled={working === 'showcase'} onPress={saveShowcase} />
+      </View> : null}
       {section === 'orders' ? <>
         <View style={styles.sectionHeading}><Text style={styles.sectionTitle}>Order queue</Text><Pressable onPress={refresh}><Text style={styles.refresh}>Refresh</Text></Pressable></View>
         <Text style={styles.helpBlock}>Thermer 80mm prepares a short-lived receipt link, then Open Thermer launches the iPhone app. Receipt and Address label keep the browser print fallback.</Text>
