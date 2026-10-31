@@ -93,6 +93,32 @@ function Card({ p, onPress }: { p: Product; onPress: () => void }) {
 }
 // Change this copy when the shop has a new announcement. No unverified offers are shown.
 const HOME_NOTICE = 'NOVA မှ ကြိုဆိုပါတယ် · သင့်အတွက် ရနံ့ကို အတူရွေးချယ်မယ်';
+type Showcase = { title: string; description: string; image_url: string | null; cta: 'discover' | 'advisor'; updated_at?: string };
+function LiveShowcase({ go }: { go: (t: Tab) => void }) {
+  const [board, setBoard] = useState<Showcase | null>(null);
+  useEffect(() => {
+    let active = true;
+    const load = async () => {
+      try {
+        const response = await fetch(apiEndpoint('/api/showcase'));
+        if (!response.ok) return;
+        const payload = await response.json();
+        if (active) setBoard(payload.board || null);
+      } catch { /* Preview can still show its normal homepage without the board. */ }
+    };
+    load();
+    const timer = setInterval(load, 30000);
+    return () => { active = false; clearInterval(timer); };
+  }, []);
+  if (!board) return null;
+  return <View style={{ marginTop: 16, backgroundColor: '#FFFFFF', borderRadius: 16, borderWidth: 1, borderColor: '#E5E0D6', padding: 15 }}>
+    <Text style={{ color: '#A17A2C', fontSize: 10, fontWeight: '800', letterSpacing: 1 }}>NOVA · LIVE SHOWCASE</Text>
+    {board.image_url ? <Image source={{ uri: board.image_url }} resizeMode="contain" style={{ width: '100%', height: 180, marginTop: 8 }} /> : null}
+    <Text style={{ color: '#102856', fontSize: 19, fontWeight: '700', marginTop: 9 }}>{board.title}</Text>
+    <Text style={{ color: '#34435B', marginTop: 5, lineHeight: 21 }}>{board.description}</Text>
+    <Pressable accessibilityRole="button" onPress={() => go(board.cta)} style={{ backgroundColor: '#102856', borderRadius: 10, padding: 12, marginTop: 12, alignSelf: 'flex-start' }}><Text style={{ color: '#FFFFFF', fontWeight: '700' }}>{board.cta === 'advisor' ? 'Ask NOVA →' : 'Explore Scents →'}</Text></Pressable>
+  </View>;
+}
 function Home({ go, pick }: { go: (t: Tab) => void; pick: (p: Product) => void }) {
   const { width, fontScale } = useWindowDimensions();
   const heroStack = width < 360 || fontScale > 1.2;
@@ -103,6 +129,7 @@ function Home({ go, pick }: { go: (t: Tab) => void; pick: (p: Product) => void }
     <View style={s.homeContent}>
       <View style={s.brandRow}><Image source={require('./assets/nova-logo-authentic.png')} style={s.brandLogo} resizeMode="contain" accessibilityLabel="NOVA" /><Pressable accessibilityRole="button" accessibilityLabel="Open your NOVA account" onPress={() => go('profile')} style={s.brandAccount}><Text style={s.brandAccountText}>Account</Text></Pressable></View>
       <View style={[s.hero, heroStack && s.heroStack]}><View style={[s.heroCopyBlock, heroStack && s.heroCopyStack]}><Text style={s.heroKicker}>NOVA FRAGRANCE</Text><Text style={s.heroTitle}>Your scent.{`\n`}Your story.</Text><Text style={s.heroCopy}>သင့်ရဲ့ စတိုင်နဲ့ လိုက်ဖက်မယ့် ရနံ့ကို ရှာဖွေလိုက်ပါ။</Text><Pressable accessibilityRole="button" accessibilityLabel="Explore NOVA scents" onPress={() => go('discover')} style={s.heroButton}><Text style={s.heroButtonText}>Explore scents  →</Text></Pressable></View><Image source={require('./assets/nova-perfume-set.png')} style={[s.heroImage, heroStack && s.heroImageStack]} resizeMode="contain" accessibilityLabel="NOVA perfume set" /></View>
+      <LiveShowcase go={go} />
       <View style={[s.adviserCard, adviserStack && s.adviserCardStack]}><View style={[s.adviserWords, adviserStack && s.adviserWordsStack]}><Text style={s.adviserKicker}>A LITTLE HELP, FROM NOVA</Text><Text style={s.adviserTitle}>Meet your Scent Adviser</Text><Text style={s.adviserCopy}>မေးလိုက်ပါ။ သင့်စိတ်ခံစားချက်နဲ့ အချိန်အခါအလိုက် ရနံ့ရွေးပေးမယ်။</Text><View style={s.adviserChips}>{adviserChips.map(chip => <Pressable key={chip} accessibilityRole="button" accessibilityLabel={`Ask NOVA about ${chip} scents`} onPress={() => go('advisor')} style={s.adviserChip}><Text style={s.adviserChipText}>{chip}</Text></Pressable>)}</View><Pressable accessibilityRole="button" accessibilityLabel="Ask NOVA Scent Adviser" onPress={() => go('advisor')} style={s.adviserCta}><Text style={s.adviserCtaText}>Ask NOVA  →</Text></Pressable></View><View style={[s.robotFrame, adviserStack && s.robotFrameStack]}><Image source={require('./assets/nova-ai-robot.jpg')} style={s.robotImage} resizeMode="contain" accessible={false} /></View></View>
       <View style={s.sectionHead}><View><Text style={s.sectionTitle}>Find your favourite</Text><Text style={s.sectionSub}>NOVA ရနံ့များကို ရှာဖွေပါ</Text></View><Pressable accessibilityRole="button" accessibilityLabel="See all NOVA scents" onPress={() => go('discover')} style={s.seeAllButton}><Text style={s.seeAll}>See all  →</Text></Pressable></View>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.rowList}>{products.slice(0, 3).map(p => <Card key={p.id} p={p} onPress={() => pick(p)} />)}</ScrollView>
