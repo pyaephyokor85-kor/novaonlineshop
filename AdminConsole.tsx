@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Platform, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { novaCatalog } from './data/nova-catalog';
 import { buildAddressLabelHtml, buildReceiptHtml } from './lib/print-templates.mjs';
+import { printBleOrder } from './lib/web-bluetooth-print.mjs';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import shopPricing from './data/shop-pricing.json';
 
@@ -129,6 +130,13 @@ export default function AdminConsole({ onSignOut, authClient }: { onSignOut: () 
     const html = kind === 'receipt' ? buildReceiptHtml(order, width) : buildAddressLabelHtml(order, width);
     popup.document.open(); popup.document.write(html); popup.document.close();
   };
+  const printBluetooth = async (order: Order, kind: 'receipt' | 'label') => {
+    setError(''); setNotice('');
+    try {
+      await printBleOrder(order, kind);
+      setNotice(`${order.order_number}: data sent to Bluetooth printer. Verify paper output.`);
+    } catch (problem: any) { setError(problem?.message || 'Bluetooth printing failed.'); }
+  };
   const prepareThermer = async (order: Order) => {
     if (Platform.OS !== 'web' || typeof window === 'undefined') { setError('Thermer printing is available in the iPhone web Preview.'); return; }
     setError(''); setNotice(''); setThermerLink(null); setPreparingThermer(order.id);
@@ -175,7 +183,7 @@ export default function AdminConsole({ onSignOut, authClient }: { onSignOut: () 
           {(order.nova_order_items || []).map((item, index) => <Text key={`${order.id}-${index}`} style={styles.item}>{item.product_name} ({item.product_id}) · {item.size} × {item.quantity} · {money(item.unit_price)} each</Text>)}
           <Text style={styles.totalLine}>Subtotal: {money(order.subtotal)}</Text>{order.discount_percent > 0 ? <Text style={styles.discountLine}>Discount ({order.discount_percent}%): −{money(order.discount_amount)}</Text> : null}<Text style={styles.totalLine}>COD merchandise total: {money(order.total)}</Text><Text style={styles.timestamp}>Delivery fee not included; confirm separately.</Text>
           <Text style={styles.timestamp}>{new Date(order.created_at).toLocaleString()}</Text>
-          <View style={styles.actionRow}>{nextStatus[order.status] ? <PrintButton title={nextStatus[order.status] === 'confirmed' ? 'Confirm' : nextStatus[order.status] === 'packing' ? 'Packing' : 'Delivery'} onPress={() => updateStatus(order, nextStatus[order.status] as string)} /> : null}{!['delivery', 'cancelled'].includes(order.status) ? <PrintButton title="Cancel" onPress={() => updateStatus(order, 'cancelled')} /> : null}<PrintButton title="Receipt" onPress={() => print(order, 'receipt')} /><PrintButton title="Address label" onPress={() => print(order, 'label')} /><PrintButton title={preparingThermer === order.id ? 'Preparing…' : 'Thermer 80mm'} disabled={Boolean(preparingThermer)} onPress={() => prepareThermer(order)} />{thermerLink?.orderId === order.id ? <PrintButton title="Open Thermer" onPress={() => openThermer(order.id)} /> : null}</View>
+          <View style={styles.actionRow}>{nextStatus[order.status] ? <PrintButton title={nextStatus[order.status] === 'confirmed' ? 'Confirm' : nextStatus[order.status] === 'packing' ? 'Packing' : 'Delivery'} onPress={() => updateStatus(order, nextStatus[order.status] as string)} /> : null}{!['delivery', 'cancelled'].includes(order.status) ? <PrintButton title="Cancel" onPress={() => updateStatus(order, 'cancelled')} /> : null}<PrintButton title="Receipt" onPress={() => print(order, 'receipt')} /><PrintButton title="Address label" onPress={() => print(order, 'label')} /><PrintButton title="BLE Receipt (Android)" onPress={() => printBluetooth(order, 'receipt')} /><PrintButton title="BLE Label (Android)" onPress={() => printBluetooth(order, 'label')} /><PrintButton title={preparingThermer === order.id ? 'Preparing…' : 'Thermer 80mm'} disabled={Boolean(preparingThermer)} onPress={() => prepareThermer(order)} />{thermerLink?.orderId === order.id ? <PrintButton title="Open Thermer" onPress={() => openThermer(order.id)} /> : null}</View>
           {(order.nova_order_status_history || []).length ? <Text style={styles.timestamp}>History: {(order.nova_order_status_history || []).map(event => statusLabel[event.to_status] || event.to_status).join(' → ')}</Text> : null}
         </View>)}
       </> : section === 'stock' ? <>
