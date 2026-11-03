@@ -5,6 +5,7 @@ import { createClient } from '@supabase/supabase-js';
 import { Image, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import './global.css';
+import AdminRoute from './AdminRoute';
 import { novaCatalog } from './data/nova-catalog';
 import shopPricing from './data/shop-pricing.json';
 type BottleSize = keyof typeof shopPricing.sizes;
@@ -18,8 +19,8 @@ type Message = { id: string; from: 'nova' | 'user'; text: string; recommendation
 type FragranceProfile = { favoriteFamilies: string[]; preferredNotes: string[]; moods: string[]; occasions: string[]; dislikes: string[]; lastRecommendation?: string; updatedAt?: string };
 const emptyProfile: FragranceProfile = { favoriteFamilies: [], preferredNotes: [], moods: [], occasions: [], dislikes: [] };
 const PROFILE_ID_KEY = '@nova/fragrance-profile-id';
-const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL || '';
-const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
+const SUPABASE_URL = process.env.EXPO_PUBLIC_NOVA_PREVIEW_SUPABASE_URL || process.env.EXPO_PUBLIC_SUPABASE_URL || '';
+const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_NOVA_PREVIEW_SUPABASE_ANON_KEY || process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
 const supabase = SUPABASE_URL && SUPABASE_ANON_KEY ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { storage: AsyncStorage, autoRefreshToken: true, persistSession: true, detectSessionInUrl: false } }) : null;
 const getProfileId = async () => {
   const user = supabase ? (await supabase.auth.getSession()).data.session?.user : null;
@@ -92,6 +93,32 @@ function Card({ p, onPress }: { p: Product; onPress: () => void }) {
 }
 // Change this copy when the shop has a new announcement. No unverified offers are shown.
 const HOME_NOTICE = 'NOVA မှ ကြိုဆိုပါတယ် · သင့်အတွက် ရနံ့ကို အတူရွေးချယ်မယ်';
+type Showcase = { title: string; description: string; image_url: string | null; cta: 'discover' | 'advisor'; updated_at?: string };
+function LiveShowcase({ go }: { go: (t: Tab) => void }) {
+  const [board, setBoard] = useState<Showcase | null>(null);
+  useEffect(() => {
+    let active = true;
+    const load = async () => {
+      try {
+        const response = await fetch(apiEndpoint('/api/showcase'));
+        if (!response.ok) return;
+        const payload = await response.json();
+        if (active) setBoard(payload.board || null);
+      } catch { /* Preview can still show its normal homepage without the board. */ }
+    };
+    load();
+    const timer = setInterval(load, 30000);
+    return () => { active = false; clearInterval(timer); };
+  }, []);
+  if (!board) return null;
+  return <View style={{ marginTop: 16, backgroundColor: '#FFFFFF', borderRadius: 16, borderWidth: 1, borderColor: '#E5E0D6', padding: 15 }}>
+    <Text style={{ color: '#A17A2C', fontSize: 10, fontWeight: '800', letterSpacing: 1 }}>NOVA · LIVE SHOWCASE</Text>
+    {board.image_url ? <Image source={{ uri: board.image_url }} resizeMode="contain" style={{ width: '100%', height: 180, marginTop: 8 }} /> : null}
+    <Text style={{ color: '#102856', fontSize: 19, fontWeight: '700', marginTop: 9 }}>{board.title}</Text>
+    <Text style={{ color: '#34435B', marginTop: 5, lineHeight: 21 }}>{board.description}</Text>
+    <Pressable accessibilityRole="button" onPress={() => go(board.cta)} style={{ backgroundColor: '#102856', borderRadius: 10, padding: 12, marginTop: 12, alignSelf: 'flex-start' }}><Text style={{ color: '#FFFFFF', fontWeight: '700' }}>{board.cta === 'advisor' ? 'Ask NOVA →' : 'Explore Scents →'}</Text></Pressable>
+  </View>;
+}
 function Home({ go, pick }: { go: (t: Tab) => void; pick: (p: Product) => void }) {
   const { width, fontScale } = useWindowDimensions();
   const heroStack = width < 360 || fontScale > 1.2;
@@ -102,6 +129,7 @@ function Home({ go, pick }: { go: (t: Tab) => void; pick: (p: Product) => void }
     <View style={s.homeContent}>
       <View style={s.brandRow}><Image source={require('./assets/nova-logo-authentic.png')} style={s.brandLogo} resizeMode="contain" accessibilityLabel="NOVA" /><Pressable accessibilityRole="button" accessibilityLabel="Open your NOVA account" onPress={() => go('profile')} style={s.brandAccount}><Text style={s.brandAccountText}>Account</Text></Pressable></View>
       <View style={[s.hero, heroStack && s.heroStack]}><View style={[s.heroCopyBlock, heroStack && s.heroCopyStack]}><Text style={s.heroKicker}>NOVA FRAGRANCE</Text><Text style={s.heroTitle}>Your scent.{`\n`}Your story.</Text><Text style={s.heroCopy}>သင့်ရဲ့ စတိုင်နဲ့ လိုက်ဖက်မယ့် ရနံ့ကို ရှာဖွေလိုက်ပါ။</Text><Pressable accessibilityRole="button" accessibilityLabel="Explore NOVA scents" onPress={() => go('discover')} style={s.heroButton}><Text style={s.heroButtonText}>Explore scents  →</Text></Pressable></View><Image source={require('./assets/nova-perfume-set.png')} style={[s.heroImage, heroStack && s.heroImageStack]} resizeMode="contain" accessibilityLabel="NOVA perfume set" /></View>
+      <LiveShowcase go={go} />
       <View style={[s.adviserCard, adviserStack && s.adviserCardStack]}><View style={[s.adviserWords, adviserStack && s.adviserWordsStack]}><Text style={s.adviserKicker}>A LITTLE HELP, FROM NOVA</Text><Text style={s.adviserTitle}>Meet your Scent Adviser</Text><Text style={s.adviserCopy}>မေးလိုက်ပါ။ သင့်စိတ်ခံစားချက်နဲ့ အချိန်အခါအလိုက် ရနံ့ရွေးပေးမယ်။</Text><View style={s.adviserChips}>{adviserChips.map(chip => <Pressable key={chip} accessibilityRole="button" accessibilityLabel={`Ask NOVA about ${chip} scents`} onPress={() => go('advisor')} style={s.adviserChip}><Text style={s.adviserChipText}>{chip}</Text></Pressable>)}</View><Pressable accessibilityRole="button" accessibilityLabel="Ask NOVA Scent Adviser" onPress={() => go('advisor')} style={s.adviserCta}><Text style={s.adviserCtaText}>Ask NOVA  →</Text></Pressable></View><View style={[s.robotFrame, adviserStack && s.robotFrameStack]}><Image source={require('./assets/nova-ai-robot.jpg')} style={s.robotImage} resizeMode="contain" accessible={false} /></View></View>
       <View style={s.sectionHead}><View><Text style={s.sectionTitle}>Find your favourite</Text><Text style={s.sectionSub}>NOVA ရနံ့များကို ရှာဖွေပါ</Text></View><Pressable accessibilityRole="button" accessibilityLabel="See all NOVA scents" onPress={() => go('discover')} style={s.seeAllButton}><Text style={s.seeAll}>See all  →</Text></Pressable></View>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.rowList}>{products.slice(0, 3).map(p => <Card key={p.id} p={p} onPress={() => pick(p)} />)}</ScrollView>
@@ -125,7 +153,7 @@ function ProfileMemory({ profile }: { profile: FragranceProfile }) {
   return <View style={s.memoryCard}><View style={s.memoryTitleRow}><Text style={s.memoryTitle}>Your fragrance profile</Text><Text style={s.memorySpark}>✦</Text></View><Text style={s.memoryCopy}>{items.length ? 'NOVA is learning your scent signature.' : 'Chat with NOVA to start building your scent signature.'}</Text><View style={s.chipRow}>{items.map(item => <View style={s.chip} key={item}><Text style={s.chipText}>{item}</Text></View>)}</View>{profile.moods.length > 0 && <Text style={s.memoryMeta}>Mood: {profile.moods.slice(0, 2).join(' · ')}</Text>}</View>;
 }
 function RecommendationStrip({ items, pick }: { items: Recommendation[]; pick: (p: Product) => void }) {
-  return <View className="mt-1"><Text className="mb-2 text-[10px] font-bold tracking-[1.5px] text-nova-clay">CURATED FOR YOUR PROFILE</Text><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerClassName="gap-2 pb-1">{items.filter(item => !item.blocked).slice(0, 3).map(item => <View key={item.id} className="w-40 rounded-2xl border border-[#E8DED1] bg-[#FFFDF9] p-3"><Text className="text-[12px] font-bold text-nova-ink">{item.name}</Text><Text className="mt-1 text-[10px] text-nova-clay">{item.family.join(' · ')}</Text><Text className="mt-2 text-[10px] leading-4 text-nova-muted">{item.matchedNotes.length ? `Matches ${item.matchedNotes.join(', ')}` : 'A balanced NOVA signature'}</Text>{item.seasonalMatches.length ? <Text className="mt-1 text-[10px] leading-4 text-[#A8754B]">Seasonal: {item.seasonalMatches.slice(0, 2).join(', ')}</Text> : null}{item.purchaseMatches > 0 ? <Text className="mt-1 text-[10px] leading-4 text-[#6D8B6F]">Based on your purchase history</Text> : null}<Text className="mt-2 text-[11px] font-bold text-nova-ink">{shopPricing.priceLabel}</Text><Text className="mt-1 text-[10px] text-nova-clay">{shopPricing.paymentLabel}</Text><Pressable accessibilityRole="button" accessibilityLabel={`Open order form for ${item.id} ${item.name}`} onPress={() => { const product = products.find(p => p.id === item.id); if (product) pick(product); }} style={{ minHeight: 44, justifyContent: 'center', marginTop: 8 }}><Text className="text-[11px] font-bold text-nova-ink">အော်ဒါဖောင်ဖွင့်မယ် →</Text></Pressable></View>)}</ScrollView></View>;
+  return <View className="mt-1"><Text className="mb-2 text-[10px] font-bold tracking-[1.5px] text-nova-clay">CURATED FOR YOUR PROFILE</Text><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerClassName="gap-2 pb-1">{items.filter(item => !item.blocked).slice(0, 3).map(item => <View key={item.id} className="w-40 rounded-2xl border border-[#E8DED1] bg-[#FFFDF9] p-3"><Text className="text-[12px] font-bold text-nova-ink">{item.name}</Text><Text className="mt-1 text-[10px] text-nova-clay">{item.family.join(' · ')}</Text><Text className="mt-2 text-[10px] leading-4 text-nova-muted">{item.matchedNotes.length ? `Matches ${item.matchedNotes.join(', ')}` : 'A balanced NOVA signature'}</Text>{item.seasonalMatches.length ? <Text className="mt-1 text-[10px] leading-4 text-[#A8754B]">Seasonal: {item.seasonalMatches.slice(0, 2).join(', ')}</Text> : null}{item.purchaseMatches > 0 ? <Text className="mt-1 text-[10px] leading-4 text-[#6D8B6F]">Based on your purchase history</Text> : null}<Text className="mt-2 text-[11px] font-bold text-nova-ink">{shopPricing.priceLabel}</Text><Pressable accessibilityRole="button" accessibilityLabel={`Open order form for ${item.id} ${item.name}`} onPress={() => { const product = products.find(p => p.id === item.id); if (product) pick(product); }} style={{ minHeight: 44, justifyContent: 'center', marginTop: 8 }}><Text className="text-[11px] font-bold text-nova-ink">အော်ဒါဖောင်ဖွင့်မယ် →</Text></Pressable></View>)}</ScrollView></View>;
 }
 // Validate only the response fields used by the client; never display raw error bodies.
 const isRecord = (value: unknown): value is Record<string, unknown> => Boolean(value && typeof value === 'object' && !Array.isArray(value));
@@ -252,10 +280,20 @@ function Detail({ p, close }: { p: Product; close: () => void }) {
   const [size, setSize] = useState<BottleSize | null>(null);
   const [sending, setSending] = useState(false); const sendingRef = useRef(false);
   const [orderStatus, setOrderStatus] = useState('');
+  const [discountOffer, setDiscountOffer] = useState({ enabled: false, percent: 0 });
+  const idempotencyKeyRef = useRef('');
+  useEffect(() => {
+    let active = true;
+    (async () => { try { if (Platform.OS !== 'web' && !API_URL) return; const response = await fetch(apiEndpoint('/api/current-discount')); if (!response.ok) return; const setting = await response.json(); if (active && setting.enabled === true && Number.isFinite(Number(setting.percent))) setDiscountOffer({ enabled: true, percent: Math.max(0, Math.min(100, Number(setting.percent))) }); } catch { /* Keep the safe no-discount estimate if Preview settings are unavailable. */ } })();
+    return () => { active = false; };
+  }, []);
   const amount = Number(quantity);
   const validQuantity = Number.isInteger(amount) && amount >= 1 && amount <= 99;
   const unitPrice = size ? shopPricing.sizes[size] : null;
   const total = unitPrice !== null && validQuantity ? unitPrice * amount : null;
+  const discountPercent = discountOffer.enabled ? discountOffer.percent : 0;
+  const discountAmount = total === null ? null : Math.round(total * discountPercent / 100);
+  const codTotal = total === null || discountAmount === null ? null : total - discountAmount;
   const submitOrder = async () => {
     if (sendingRef.current) return;
     setOrderStatus('');
@@ -264,13 +302,19 @@ function Detail({ p, close }: { p: Product; close: () => void }) {
     if (!name.trim() || !phone.trim() || !address.trim()) { setOrderStatus('အမည်၊ ဖုန်းနံပါတ်နဲ့ ပို့ရမယ့်လိပ်စာ ဖြည့်ပေးပါ။'); return; }
     sendingRef.current = true; setSending(true);
     try {
-      const res = await fetch(apiEndpoint('/api/order-notification'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ customerName: name.trim(), phone: phone.trim(), address: address.trim(), quantity: amount, size, paymentMethod: shopPricing.paymentMethod, product: { id: p.id } }) });
+      if (!idempotencyKeyRef.current) idempotencyKeyRef.current = `NOVA_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+      const res = await fetch(apiEndpoint('/api/order-notification'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ customerName: name.trim(), phone: phone.trim(), address: address.trim(), quantity: amount, size, paymentMethod: shopPricing.paymentMethod, idempotencyKey: idempotencyKeyRef.current, product: { id: p.id } }) });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || data.ok !== true) {
         setOrderStatus(res.status === 503 ? 'အော်ဒါလက်ခံစနစ် မချိတ်ဆက်ရသေးပါ။ အော်ဒါ မပို့ရသေးပါ။' : 'အော်ဒါပို့မှုကို အတည်မပြုနိုင်သေးပါ။ ချက်ချင်း ထပ်မပို့ဘဲ ဆိုင်နှင့် အတည်ပြုပေးပါ။');
         return;
       }
-      setOrderStatus('အော်ဒါတောင်းဆိုချက် ပို့ပြီးပါပြီ။ ပစ္စည်းရရှိမှုနဲ့ ပို့ခကို ဆိုင်က ဆက်သွယ်အတည်ပြုပေးပါမယ်။ COD — အိမ်ရောက်ငွေချေပါ။');
+      if (data.orderNumber) {
+        const discountText = Number(data.discountAmount) > 0 ? ` Discount ${data.discountPercent}%: −${money(Number(data.discountAmount))}.` : '';
+        const notificationText = data.notificationSent === false && !data.duplicate ? ' The order is saved in the Preview queue, but its Telegram notice was not sent.' : '';
+        setOrderStatus(`Order ${data.orderNumber} received. Subtotal ${money(Number(data.subtotal))}.${discountText} COD merchandise total ${money(Number(data.total))}; delivery fee is separate.${notificationText}`);
+      } else setOrderStatus('အော်ဒါတောင်းဆိုချက် ပို့ပြီးပါပြီ။ ပစ္စည်းရရှိမှုနဲ့ ပို့ခကို ဆိုင်က ဆက်သွယ်အတည်ပြုပေးပါမယ်။ COD — အိမ်ရောက်ငွေချေပါ။');
+      idempotencyKeyRef.current = '';
       setName(''); setPhone(''); setAddress(''); setQuantity('1'); setSize(null);
     } catch {
       setOrderStatus('ပို့မှုအခြေအနေကို အတည်မပြုနိုင်သေးပါ။ ထပ်မပို့ခင် ဆိုင်နှင့် စစ်ဆေးပေးပါ။');
@@ -296,7 +340,9 @@ function Detail({ p, close }: { p: Product; close: () => void }) {
     <View style={[field, { marginTop: 16 }]}>
       <Text>{p.id} — {p.name}</Text>
       <Text style={{ marginTop: 8 }}>{size ? `${size} · ${money(unitPrice!)} × ${validQuantity ? amount : '—'}` : 'အရွယ်အစား ရွေးပေးပါ။'}</Text>
-      <Text accessibilityLiveRegion="polite" style={{ color: '#102B62', fontSize: 17, fontWeight: '700', marginTop: 10 }}>ကုန်ပစ္စည်းစုစုပေါင်း: {total === null ? '—' : money(total)}</Text>
+      <Text style={{ marginTop: 8 }}>ကုန်ပစ္စည်းစုစုပေါင်း: {total === null ? '—' : money(total)}</Text>
+      {discountPercent > 0 && discountAmount !== null ? <Text style={{ marginTop: 6, color: '#355F3C' }}>လျှော့ဈေး ({discountPercent}%): −{money(discountAmount)}</Text> : null}
+      <Text accessibilityLiveRegion="polite" style={{ color: '#102B62', fontSize: 17, fontWeight: '700', marginTop: 8 }}>COD ပစ္စည်းစုစုပေါင်း: {codTotal === null ? '—' : money(codTotal)}</Text>
       <Text style={{ marginTop: 8 }}>{shopPricing.paymentLabel}</Text>
       <Text style={{ marginTop: 8, lineHeight: 22 }}>ပို့ခ မပါသေးပါ။ ပစ္စည်းရရှိမှုနဲ့ ပို့ခကို ဆိုင်က ဆက်သွယ်အတည်ပြုပြီးမှ ပို့ပေးပါမယ်။</Text>
     </View>
@@ -304,7 +350,7 @@ function Detail({ p, close }: { p: Product; close: () => void }) {
     {orderStatus ? <Text accessibilityRole="alert" style={{ color: '#80583D', marginTop: 12, lineHeight: 22 }}>{orderStatus}</Text> : null}
   </ScrollView></SafeAreaView>;
 }
-function NovaApp() {
+function StorefrontApp() {
   const [tab, setTab] = useState<Tab>('home');
   const [selected, setSelected] = useState<Product | null>(null);
   const [session, setSession] = useState<string | null>(null);
@@ -328,7 +374,8 @@ function NovaApp() {
  if (booting) return <SafeAreaView style={s.auth}><StatusBar style="dark" /></SafeAreaView>; const screen = tab === 'home' ? <Home go={setTab} pick={setSelected} /> : tab === 'discover' ? <Discover pick={setSelected} /> : tab === 'advisor' ? <Advisor pick={setSelected} /> : !session ? <AuthScreen onAuth={setSession} /> : <Profile onSignOut={async () => { if (supabase) await supabase.auth.signOut(); await AsyncStorage.removeItem('@nova/local-session'); setTab('home'); setSelected(null); setSession(null); }} />; return <SafeAreaView style={s.app}><StatusBar style="dark" />{screen}<View style={s.nav}>{([['home', '⌂', 'Home'], ['discover', '◒', 'Discover'], ['advisor', '✦', 'Advisor'], ['profile', '○', 'Profile']] as const).map(([key, icon, label]) => <Pressable key={key} onPress={() => setTab(key)} style={s.navItem}><Text style={[s.navIcon, tab === key && s.navActive]}>{icon}</Text><Text style={[s.navLabel, tab === key && s.navActive]}>{label}</Text></Pressable>)}</View><Modal visible={Boolean(selected)} animationType="slide" onRequestClose={() => {}}>{selected ? <Detail key={selected.id} p={selected} close={() => setSelected(null)} /> : null}</Modal></SafeAreaView>; }
 
 export default function App() {
-  return <SafeAreaProvider><NovaApp /></SafeAreaProvider>;
+  const isAdminRoute = Platform.OS === 'web' && typeof window !== 'undefined' && window.location.pathname.replace(/\/+$/, '') === '/admin';
+  return <SafeAreaProvider>{isAdminRoute ? <AdminRoute /> : <StorefrontApp />}</SafeAreaProvider>;
 }
 
 const s = StyleSheet.create({

@@ -3,7 +3,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { processOrderNotification } from './lib/order-notification.mjs';
+import { processAdminRequest, processPublicDiscountRequest } from './lib/order-management.mjs';
 import scentAdvisorHandler from './api/scent-advisor.mjs';
+import { processThermerTicketRequest, processThermerResponseRequest, THERMER_RESPONSE_HEADERS } from './lib/thermer-print.mjs';
 
 const port = Number(process.env.PORT || 8787);
 const provider = (process.env.LLM_PROVIDER || 'openai').toLowerCase();
@@ -17,12 +19,13 @@ const profileFile = (id) => {
   return path.join(profileDir, `${value}.json`);
 };
 const emptyProfile = { favoriteFamilies: [], preferredNotes: [], moods: [], occasions: [], dislikes: [] };
-const supabaseUrl = process.env.SUPABASE_URL || process.env.EXPO_PUBLIC_SUPABASE_URL || '';
-const supabaseKey = process.env.SUPABASE_ANON_KEY || process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
+const supabaseUrl = process.env.EXPO_PUBLIC_NOVA_PREVIEW_SUPABASE_URL || process.env.SUPABASE_URL || process.env.EXPO_PUBLIC_SUPABASE_URL || '';
+const supabaseKey = process.env.EXPO_PUBLIC_NOVA_PREVIEW_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
 fs.mkdirSync(profileDir, { recursive: true });
 const catalogProducts = JSON.parse(fs.readFileSync(path.join(dataDir, 'nova-catalog.json'), 'utf8'));
 
 function json(res, status, body) { res.writeHead(status, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'Content-Type, Authorization', 'Access-Control-Allow-Methods': 'GET,POST,PUT,OPTIONS' }); res.end(JSON.stringify(body)); }
+function printJson(res, status, body) { res.writeHead(status, THERMER_RESPONSE_HEADERS); res.end(JSON.stringify(body)); }
 function readBody(req) {
   return new Promise((resolve, reject) => {
     let chunks = []; let size = 0; let settled = false;
@@ -79,6 +82,15 @@ async function writeCloudProfile(req, profile) {
 function readProfile(id) { try { return { ...emptyProfile, ...JSON.parse(fs.readFileSync(profileFile(id), 'utf8')) }; } catch { return { ...emptyProfile }; } }
 function saveProfile(id, profile) { fs.writeFileSync(profileFile(id), JSON.stringify({ ...profile, updatedAt: new Date().toISOString() }, null, 2)); }
 const server = http.createServer(async (req, res) => {
+  const printPath = String(req.url || '').split('?')[0];
+  if (printPath === '/api/admin/print-ticket' || printPath === '/api/print-response') {
+    try {
+      const body = printPath === '/api/admin/print-ticket' && req.method === 'POST' ? await readBody(req) : undefined;
+      const request = { method: req.method, url: req.url, headers: req.headers, body };
+      const result = printPath === '/api/admin/print-ticket' ? await processThermerTicketRequest(request) : await processThermerResponseRequest(request);
+      return printJson(res, result.status, result.body);
+    } catch (error) { return printJson(res, error.statusCode || 400, { error: error.message || 'Preview print request failed.' }); }
+  }
   if (req.method === 'OPTIONS') return json(res, 204, {});
   if (req.method === 'GET' && req.url === '/health') return json(res, 200, { ok: true, provider, model, memory: 'file-backed', supabase: Boolean(supabaseUrl && supabaseKey), catalogSize: catalogProducts.length });
   if (req.url === '/api/cloud-profile' && req.method === 'GET') { try { const result = await readCloudProfile(req); return json(res, result.error ? result.status : 200, result.error ? { error: result.error } : { profile: result.profile, user: { id: result.user.id, email: result.user.email } }); } catch (e) { return json(res, 502, { error: e.message }); } }
@@ -88,6 +100,15 @@ const server = http.createServer(async (req, res) => {
   if (match && req.method === 'POST') { try { const body = await readBody(req); const profile = { ...readProfile(match[1]), ...(body.profile || {}) }; saveProfile(match[1], profile); return json(res, 200, { profile }); } catch (e) { return json(res, 400, { error: e.message }); } }
   if (req.url === '/api/cloud-purchases' && req.method === 'GET') { try { const auth = await authenticatedSupabaseUser(req); if (auth.error) return json(res, auth.status, { error: auth.error }); const r = await fetch(`${supabaseUrl}/rest/v1/fragrance_purchases?select=product_id,purchased_at,quantity,price&order=purchased_at.desc`, { headers: { apikey: supabaseKey, Authorization: `Bearer ${auth.token}` } }); const data = await r.json().catch(() => ({})); return json(res, r.ok ? 200 : r.status, r.ok ? { purchases: data } : { error: data.message || 'Supabase purchase history read failed' }); } catch (e) { return json(res, 502, { error: e.message }); } }
   if (req.url === '/api/cloud-purchases' && req.method === 'POST') { try { const auth = await authenticatedSupabaseUser(req); if (auth.error) return json(res, auth.status, { error: auth.error }); const body = await readBody(req); const purchase = body.purchase || {}; if (!catalogProducts.some(x => x.id === String(purchase.productId || purchase.product_id))) return json(res, 400, { error: 'Unknown NOVA product' }); const row = { user_id: auth.user.id, product_id: String(purchase.productId || purchase.product_id), purchased_at: purchase.purchasedAt || purchase.purchased_at || new Date().toISOString(), quantity: Math.max(1, Number(purchase.quantity || 1)), price: purchase.price || null }; const r = await fetch(`${supabaseUrl}/rest/v1/fragrance_purchases`, { method: 'POST', headers: { apikey: supabaseKey, Authorization: `Bearer ${auth.token}`, 'Content-Type': 'application/json', Prefer: 'return=representation' }, body: JSON.stringify(row) }); const data = await r.json().catch(() => ({})); return json(res, r.ok ? 201 : r.status, r.ok ? { purchase: data[0] || row } : { error: data.message || 'Supabase purchase history write failed' }); } catch (e) { return json(res, 502, { error: e.message }); } }
+  if (req.url === '/api/current-discount') { const result = await processPublicDiscountRequest({ method: req.method }); return json(res, result.status, result.body); }
+  const adminMatch = req.url?.match(/^\/api\/admin\/(orders|inventory|discount)$/);
+  if (adminMatch) {
+    try {
+      const body = req.method === 'POST' ? await readBody(req) : undefined;
+      const result = await processAdminRequest({ method: req.method, headers: req.headers, body }, { resource: adminMatch[1] });
+      return json(res, result.status, result.body);
+    } catch (error) { return json(res, error.statusCode || 400, { error: error.message || 'Admin request failed.' }); }
+  }
   if (req.url === '/api/order-notification') {
     try {
       const body = req.method === 'POST' ? await readBody(req) : {};
