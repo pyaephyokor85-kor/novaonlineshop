@@ -2,7 +2,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect, useRef, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createClient } from '@supabase/supabase-js';
-import { Image, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
+import { Image, Linking, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import './global.css';
 import AdminRoute from './AdminRoute';
@@ -241,9 +241,41 @@ function Advisor({ pick }: { pick: (p: Product) => void }) {
 }
 function Profile({ onSignOut }: { onSignOut: () => void }) {
   const [profile, setProfile] = useState<FragranceProfile>(emptyProfile);
+  const [supportOpen, setSupportOpen] = useState(false);
+  const [supportError, setSupportError] = useState('');
+  const openSupport = async (url: string, contact: string) => {
+    setSupportError('');
+    try {
+      await Linking.openURL(url);
+    } catch {
+      setSupportError(`Unable to open this link. You can reach NOVA at ${contact}.`);
+    }
+  };
   useEffect(() => { getProfileId().then(async id => { try { if (isCloudUser(id)) setProfile((await loadCloudProfile(id)) || emptyProfile); else { setProfile(await loadGuestProfile(id)); } } catch {} }); }, []);
   const groups = [['Favorite families', profile.favoriteFamilies], ['Preferred notes', profile.preferredNotes], ['Best for', profile.occasions], ['Avoids', profile.dislikes]] as const;
-  return <ScrollView contentContainerStyle={s.page}><View style={s.profileTop}><View style={s.largeAvatar}><Text style={s.largeAvatarText}>N</Text></View><Text style={s.profileName}>NOVA guest</Text><Text style={s.profileSub}>Your scent journey, remembered.</Text></View><View style={s.profileMemory}><Text style={s.profileMemoryKicker}>VIRTUAL FRAGRANCE PROFILE</Text><Text style={s.profileMemoryTitle}>A signature that evolves with you.</Text><Text style={s.profileMemoryCopy}>Every conversation helps NOVA understand your taste — privately and progressively.</Text></View>{groups.map(([label, values]) => <View key={label} style={s.profileRow}><Text style={s.profileRowLabel}>{label}</Text><Text style={s.profileRowValue}>{values.length ? values.join(' · ') : 'Not discovered yet'}</Text></View>)}{['♡  Saved scents', '◷  Scent history', '⌁  Preferences', '◌  Help & support'].map(x => <Pressable key={x} style={s.menu}><Text style={s.menuText}>{x}</Text><Text style={s.chevron}>›</Text></Pressable>)}<Pressable onPress={onSignOut} style={s.menu}><Text style={[s.menuText, { color: '#A35F4B' }]}>↪  Sign out</Text><Text style={s.chevron}>›</Text></Pressable></ScrollView>;
+  return <ScrollView contentContainerStyle={s.page}><View style={s.profileTop}><View style={s.largeAvatar}><Text style={s.largeAvatarText}>N</Text></View><Text style={s.profileName}>NOVA guest</Text><Text style={s.profileSub}>Your scent journey, remembered.</Text></View><View style={s.profileMemory}><Text style={s.profileMemoryKicker}>VIRTUAL FRAGRANCE PROFILE</Text><Text style={s.profileMemoryTitle}>A signature that evolves with you.</Text><Text style={s.profileMemoryCopy}>Every conversation helps NOVA understand your taste — privately and progressively.</Text></View>{groups.map(([label, values]) => <View key={label} style={s.profileRow}><Text style={s.profileRowLabel}>{label}</Text><Text style={s.profileRowValue}>{values.length ? values.join(' · ') : 'Not discovered yet'}</Text></View>)}
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ expanded: supportOpen }}
+      onPress={() => setSupportOpen(!supportOpen)}
+      style={s.menu}
+    >
+      <Text style={s.menuText}>◌  Help &amp; Support</Text>
+      <Text style={s.chevron}>{supportOpen ? '⌄' : '›'}</Text>
+    </Pressable>
+    {supportOpen && <>
+      <Pressable accessibilityRole="link" onPress={() => openSupport('tel:+959668781312', '09668781312')} style={s.menu}>
+        <Text style={s.menuText}>Phone · 09668781312</Text><Text style={s.chevron}>›</Text>
+      </Pressable>
+      <Pressable accessibilityRole="link" onPress={() => openSupport('viber://chat?number=%2B959668781312', '09668781312')} style={s.menu}>
+        <Text style={s.menuText}>Viber · 09668781312</Text><Text style={s.chevron}>›</Text>
+      </Pressable>
+      <Pressable accessibilityRole="link" onPress={() => openSupport('https://t.me/Nova_266', '@Nova_266')} style={s.menu}>
+        <Text style={s.menuText}>Telegram · @Nova_266</Text><Text style={s.chevron}>›</Text>
+      </Pressable>
+      {supportError ? <Text accessibilityRole="alert" style={s.profileSub}>{supportError}</Text> : null}
+    </>}
+    <Pressable onPress={onSignOut} style={s.menu}><Text style={[s.menuText, { color: '#A35F4B' }]}>↪  Sign out</Text><Text style={s.chevron}>›</Text></Pressable></ScrollView>;
 }
 function AuthScreen({ onAuth }: { onAuth: (session: string) => void }) {
   const [mode, setMode] = useState<'login' | 'signup'>('login'); const [email, setEmail] = useState(''); const [password, setPassword] = useState(''); const [error, setError] = useState('');
@@ -539,4 +571,3 @@ detailPrice: { color: '#102B62', fontSize: 24, fontWeight: '600' },
 add: { backgroundColor: '#102B62', borderRadius: 24, paddingVertical: 14, paddingHorizontal: 21 },
 addText: { color: '#F7EEE3', fontWeight: '700', fontSize: 12 }
 });
-
