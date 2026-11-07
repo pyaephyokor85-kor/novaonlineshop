@@ -267,9 +267,7 @@ function Profile({ onSignOut }: { onSignOut: () => void }) {
       <Pressable accessibilityRole="link" onPress={() => openSupport('tel:+959668781312', '09668781312')} style={s.menu}>
         <Text style={s.menuText}>Phone · 09668781312</Text><Text style={s.chevron}>›</Text>
       </Pressable>
-      <Pressable accessibilityRole="link" onPress={() => openSupport('viber://chat?number=%2B959668781312', '09668781312')} style={s.menu}>
-        <Text style={s.menuText}>Viber · 09668781312</Text><Text style={s.chevron}>›</Text>
-      </Pressable>
+      
       <Pressable accessibilityRole="link" onPress={() => openSupport('https://t.me/Nova_266', '@Nova_266')} style={s.menu}>
         <Text style={s.menuText}>Telegram · @Nova_266</Text><Text style={s.chevron}>›</Text>
       </Pressable>
