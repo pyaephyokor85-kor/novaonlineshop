@@ -87,9 +87,23 @@ function Bottle({ p, small = false }: { p: Product; small?: boolean }) {
 }
 function Card({ p, onPress }: { p: Product; onPress: () => void }) {
   const { width, fontScale } = useWindowDimensions();
-  const narrow = width < 360 || fontScale > 1.2;
+  const narrow = width < 350 || fontScale > 1.35;
   const cardWidth = narrow ? '100%' : Math.max(142, (Math.min(width, 760) - 60) / 2);
-  return <Pressable onPress={onPress} style={({ pressed }) => [s.card, { width: cardWidth }, pressed && s.pressed]}><View style={s.productImage}>{p.tag && <Text style={s.cardTag}>{p.tag}</Text>}<Bottle p={p} small /><Text style={s.heart}>♡</Text></View><View style={s.cardBody}><View style={s.productRow}><Text style={s.productName}>{p.name}</Text><Text style={s.price}>{p.price}</Text></View><Text style={s.family}>{p.family}</Text><Text style={s.notes}>{p.notes}</Text></View></Pressable>;
+  return <Pressable accessibilityRole="button" accessibilityLabel={`View ${p.id} ${p.name}, choose size and order`} onPress={onPress} style={({ pressed }) => [s.card, { width: cardWidth }, pressed && s.pressed]}>
+    <View style={s.productImage}>
+      <Text style={s.cardTag}>{p.id}</Text>
+      <Image source={require('./assets/nova-perfume-set.png')} style={s.luxuryProductPhoto} resizeMode="contain" accessibilityLabel="NOVA original 10ml and 30ml perfume packaging" />
+      <Text style={s.cardPhotoCaption}>NOVA · EAU DE PARFUM</Text>
+    </View>
+    <View style={s.cardBody}>
+      <Text numberOfLines={1} style={s.productCode}>{p.id}</Text>
+      <Text numberOfLines={2} style={s.productName}>{p.name}</Text>
+      <Text numberOfLines={1} style={s.family}>{p.family}</Text>
+      <Text style={s.luxuryPrices}>10ml {money(shopPricing.sizes['10ml'])}</Text>
+      <Text style={s.luxuryPrices}>30ml {money(shopPricing.sizes['30ml'])}</Text>
+      <View style={s.luxuryOrderButton}><Text style={s.luxuryOrderButtonText}>Choose size & order  →</Text></View>
+    </View>
+  </Pressable>;
 }
 // Change this copy when the shop has a new announcement. No unverified offers are shown.
 const HOME_NOTICE = 'NOVA မှ ကြိုဆိုပါတယ် · သင့်အတွက် ရနံ့ကို အတူရွေးချယ်မယ်';
@@ -135,38 +149,29 @@ function LiveShowcase({ go }: { go: (t: Tab) => void }) {
     <View style={s.showcaseDots}>{slides.map((item, index) => <Pressable key={item.id} accessibilityRole="button" accessibilityLabel={`Show highlight ${index + 1}`} onPress={() => setActiveSlide(index)} style={[s.showcaseDot, index === activeSlide % slides.length && s.showcaseDotActive]} />)}</View>
   </View>;
 }
-// Living NOVA mascot: animate the authentic robot image without changing the AI backend.
+// Lightweight living mascot. AI API, chat state and order flow remain unchanged.
 function LivingNovaAgent({ size = 92, thinking = false, compact = false }: { size?: number; thinking?: boolean; compact?: boolean }) {
   const blink = useRef(new Animated.Value(0)).current;
   const float = useRef(new Animated.Value(0)).current;
   const glow = useRef(new Animated.Value(0.25)).current;
   const [reduceMotion, setReduceMotion] = useState(false);
   const height = size * 765 / 800;
-
   useEffect(() => {
     let mounted = true;
-    AccessibilityInfo.isReduceMotionEnabled()
-      .then(enabled => { if (mounted) setReduceMotion(enabled); })
-      .catch(() => {});
+    AccessibilityInfo.isReduceMotionEnabled().then(enabled => { if (mounted) setReduceMotion(enabled); }).catch(() => {});
     return () => { mounted = false; };
   }, []);
-
   useEffect(() => {
     if (reduceMotion) {
       blink.stopAnimation(); float.stopAnimation(); glow.stopAnimation();
       blink.setValue(0); float.setValue(0); glow.setValue(0.25);
       return;
     }
-    // Two natural blinks, followed by a longer pause. The image stays recognizable.
     const blinkLoop = Animated.loop(Animated.sequence([
-      Animated.delay(2600),
-      Animated.timing(blink, { toValue: 1, duration: 95, useNativeDriver: true }),
-      Animated.delay(110),
-      Animated.timing(blink, { toValue: 0, duration: 125, useNativeDriver: true }),
-      Animated.delay(170),
-      Animated.timing(blink, { toValue: 1, duration: 80, useNativeDriver: true }),
-      Animated.delay(85),
-      Animated.timing(blink, { toValue: 0, duration: 110, useNativeDriver: true }),
+      Animated.delay(2600), Animated.timing(blink, { toValue: 1, duration: 95, useNativeDriver: true }),
+      Animated.delay(110), Animated.timing(blink, { toValue: 0, duration: 125, useNativeDriver: true }),
+      Animated.delay(170), Animated.timing(blink, { toValue: 1, duration: 80, useNativeDriver: true }),
+      Animated.delay(85), Animated.timing(blink, { toValue: 0, duration: 110, useNativeDriver: true }),
       Animated.delay(3400),
     ]));
     blinkLoop.start();
@@ -176,37 +181,24 @@ function LivingNovaAgent({ size = 92, thinking = false, compact = false }: { siz
     ]));
     floatLoop?.start();
     return () => { blinkLoop.stop(); floatLoop?.stop(); };
-  }, [blink, float, glow, compact, reduceMotion]);
-
+  }, [blink, float, compact, reduceMotion]);
   useEffect(() => {
-    if (reduceMotion || !thinking) {
-      glow.stopAnimation();
-      glow.setValue(0.25);
-      return;
-    }
-    const thinkingLoop = Animated.loop(Animated.sequence([
+    if (reduceMotion || !thinking) { glow.stopAnimation(); glow.setValue(0.25); return; }
+    const loop = Animated.loop(Animated.sequence([
       Animated.timing(glow, { toValue: 0.95, duration: 520, useNativeDriver: true }),
       Animated.timing(glow, { toValue: 0.25, duration: 520, useNativeDriver: true }),
     ]));
-    thinkingLoop.start();
-    return () => thinkingLoop.stop();
+    loop.start(); return () => loop.stop();
   }, [glow, thinking, reduceMotion]);
-
-  return <View accessible accessibilityRole="image" accessibilityLabel={thinking ? 'NOVA AI Agent is thinking' : 'NOVA AI Agent, animated robot mascot'} style={{ width: size, height, overflow: 'visible' }}>
+  return <View accessible accessibilityRole="image" accessibilityLabel={thinking ? 'NOVA AI Agent is thinking' : 'NOVA AI Agent animated mascot'} style={{ width: size, height, overflow: 'visible' }}>
     <Animated.View style={{ width: size, height, transform: [{ translateY: float }] }}>
       <Image source={require('./assets/nova-ai-robot.jpg')} resizeMode="stretch" style={{ width: size, height }} accessible={false} />
-      {/* The two eyelids briefly cover the glowing eyes in the original artwork. */}
-      <Animated.View pointerEvents="none" style={[s.agentEyelid, { left: '36.2%', top: '29.9%', width: '10%', height: '10.5%', opacity: blink }]}>
-        <View style={s.agentClosedEye} />
-      </Animated.View>
-      <Animated.View pointerEvents="none" style={[s.agentEyelid, { left: '57.4%', top: '32.3%', width: '10%', height: '10.5%', opacity: blink }]}>
-        <View style={s.agentClosedEye} />
-      </Animated.View>
+      <Animated.View pointerEvents="none" style={[s.agentEyelid, { left: '36.2%', top: '29.9%', width: '10%', height: '10.5%', opacity: blink }]}><View style={s.agentClosedEye} /></Animated.View>
+      <Animated.View pointerEvents="none" style={[s.agentEyelid, { left: '57.4%', top: '32.3%', width: '10%', height: '10.5%', opacity: blink }]}><View style={s.agentClosedEye} /></Animated.View>
       {thinking ? <Animated.View pointerEvents="none" style={[s.agentThinkingGlow, { opacity: glow }]} /> : null}
     </Animated.View>
   </View>;
 }
-
 function Home({ go, pick }: { go: (t: Tab) => void; pick: (p: Product) => void }) {
   const { width, fontScale } = useWindowDimensions();
   const heroStack = width < 360 || fontScale > 1.2;
@@ -226,10 +218,28 @@ function Home({ go, pick }: { go: (t: Tab) => void; pick: (p: Product) => void }
 }
 function Discover({ pick }: { pick: (p: Product) => void }) {
   const { width, fontScale } = useWindowDimensions();
-  const singleColumn = width < 360 || fontScale > 1.2;
-  const [filter, setFilter] = useState('All'); const filters = ['All', 'Woody', 'Floral', 'Fresh', 'Oud'];
-  const list = filter === 'All' ? products : products.filter(p => p.family.toLowerCase().includes(filter.toLowerCase()));
-  return <ScrollView contentContainerStyle={s.page} showsVerticalScrollIndicator={false}><View style={s.top}><View><Text style={s.eyebrow}>THE COLLECTION</Text><Text style={s.heading}>Discover NOVA.</Text></View><Text style={s.search}>⌕</Text></View><Text style={s.intro}>32 compositions. Infinite ways to be remembered.</Text><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.filters}>{filters.map(f => <Pressable key={f} onPress={() => setFilter(f)} style={[s.filter, filter === f && s.filterOn]}><Text style={[s.filterText, filter === f && s.filterTextOn]}>{f}</Text></Pressable>)}</ScrollView><View style={[s.grid, singleColumn && s.gridSingle]}>{list.map(p => <Card key={p.id} p={p} onPress={() => pick(p)} />)}</View></ScrollView>;
+  const singleColumn = width < 350 || fontScale > 1.35;
+  const [gender, setGender] = useState('All');
+  const [query, setQuery] = useState('');
+  const [family, setFamily] = useState('All');
+  const genders = ['All', 'Men', 'Women', 'Unisex'];
+  const families = ['All', 'Fresh', 'Woody', 'Floral', 'Sweet', 'Aquatic', 'Oud'];
+  const normalized = query.trim().toLowerCase();
+  const list = products.filter(p => {
+    const genderMatch = gender === 'All' || p.category?.toLowerCase() === gender.toLowerCase();
+    const familyMatch = family === 'All' || `${p.family} ${p.notes}`.toLowerCase().includes(family.toLowerCase());
+    const searchMatch = !normalized || `${p.id} ${p.name} ${p.family} ${p.notes}`.toLowerCase().includes(normalized);
+    return genderMatch && familyMatch && searchMatch;
+  });
+  return <ScrollView contentContainerStyle={s.page} showsVerticalScrollIndicator={false}>
+    <View style={s.collectionHeader}><Text style={s.collectionEyebrow}>NOVA · THE SIGNATURE COLLECTION</Text><Text style={s.collectionHeading}>Discover your scent.</Text><Text style={s.collectionSubtitle}>32 NOVA Signature Scents · Eau de Parfum</Text></View>
+    <View style={s.genderTabs}>{genders.map(g => <Pressable key={g} accessibilityRole="button" accessibilityState={{ selected: gender === g }} onPress={() => setGender(g)} style={[s.genderTab, gender === g && s.genderTabActive]}><Text style={[s.genderTabText, gender === g && s.genderTabTextActive]}>{g}{g !== 'All' ? ` (${products.filter(p => p.category?.toLowerCase() === g.toLowerCase()).length})` : ''}</Text></Pressable>)}</View>
+    <TextInput accessibilityLabel="Search NOVA scents by code, name or note" value={query} onChangeText={setQuery} placeholder="Search NV code, name or scent notes…" placeholderTextColor="#8D95A6" style={s.luxurySearch} />
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.filters}>{families.map(f => <Pressable key={f} onPress={() => setFamily(f)} style={[s.filter, family === f && s.filterOn]}><Text style={[s.filterText, family === f && s.filterTextOn]}>{f}</Text></Pressable>)}</ScrollView>
+    <Text style={s.resultsCount}>{list.length} scents available to explore</Text>
+    <View style={[s.grid, singleColumn && s.gridSingle]}>{list.map(p => <Card key={p.id} p={p} onPress={() => pick(p)} />)}</View>
+    {!list.length && <Text style={s.noResults}>No matching scent. Try another code or category.</Text>}
+  </ScrollView>;
 }
 const API_URL = (process.env.EXPO_PUBLIC_API_URL || '').replace(/\/$/, '');
 const apiEndpoint = (route: string) => {
@@ -498,6 +508,28 @@ export default function App() {
 }
 
 const s = StyleSheet.create({
+luxuryProductPhoto: { width: '93%', height: 132, marginTop: 14 },
+cardPhotoCaption: { color: '#BFA66F', fontSize: 7, letterSpacing: 1.2, marginBottom: 4 },
+productCode: { color: '#E7C66E', fontSize: 10, fontWeight: '800', letterSpacing: 0.7, marginBottom: 3 },
+luxuryPrices: { color: '#F3E9D4', fontSize: 10, lineHeight: 17, fontWeight: '600' },
+luxuryOrderButton: { minHeight: 39, backgroundColor: '#E7C66E', borderRadius: 9, alignItems: 'center', justifyContent: 'center', marginTop: 10 },
+luxuryOrderButtonText: { color: '#07152F', fontSize: 10, fontWeight: '800' },
+collectionHeader: { backgroundColor: '#08172F', padding: 18, borderRadius: 18, marginBottom: 12, borderWidth: 1, borderColor: '#A17B3E' },
+collectionEyebrow: { color: '#E7C66E', fontSize: 9, fontWeight: '800', letterSpacing: 1.2 },
+collectionHeading: { color: '#FFF9EA', fontSize: 25, fontWeight: '700', marginTop: 7 },
+collectionSubtitle: { color: '#D6C7AA', fontSize: 11, marginTop: 5 },
+genderTabs: { flexDirection: 'row', gap: 6, marginBottom: 12 },
+genderTab: { flex: 1, minHeight: 44, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F5EFE4', borderRadius: 11, borderWidth: 1, borderColor: '#D8CBB4' },
+genderTabActive: { backgroundColor: '#E7C66E', borderColor: '#A17B3E' },
+genderTabText: { color: '#182A4C', fontSize: 10, fontWeight: '700' },
+genderTabTextActive: { color: '#07152F', fontWeight: '800' },
+luxurySearch: { backgroundColor: '#FFFFFF', borderColor: '#C6B28D', borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, minHeight: 46, color: '#102B62', fontSize: 12, marginBottom: 12 },
+resultsCount: { color: '#725C38', fontSize: 11, fontWeight: '700', marginBottom: 11 },
+noResults: { color: '#6F675F', fontSize: 13, marginTop: 24, textAlign: 'center' },
+agentEyelid: { position: 'absolute', backgroundColor: '#244A8B', borderRadius: 99, alignItems: 'center', justifyContent: 'center' },
+agentClosedEye: { width: '74%', height: 1.5, backgroundColor: '#D9B96C', borderRadius: 3 },
+agentThinkingGlow: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderWidth: 2, borderColor: '#D7AD56', borderRadius: 16 },
+agentHeaderIdentity: { flexDirection: 'row', alignItems: 'center', gap: 10, flexShrink: 1 },
 showcaseCard: { backgroundColor: '#102B62', borderRadius: 20, padding: 16, marginBottom: 14, overflow: 'hidden' },
 showcaseKicker: { color: '#E8C977', fontSize: 9, letterSpacing: 1.2, fontWeight: '800' },
 showcaseMain: { minHeight: 190, flexDirection: 'row', alignItems: 'center' },
@@ -515,13 +547,13 @@ notice: { backgroundColor: '#102B62', paddingHorizontal: 16, paddingVertical: 8,
 noticeLabel: { color: '#E8C977', fontSize: 8, letterSpacing: 1.2, fontWeight: '800', flexShrink: 1 },
 noticeCopy: { color: '#FFF9ED', fontSize: 10, lineHeight: 16, flex: 1 },
 homeContent: { paddingHorizontal: 18 },
-brandRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: 14, paddingBottom: 12 },
-brandLogo: { width: 112, height: 34 },
+brandRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: 5, paddingBottom: 5, paddingHorizontal: 12, marginTop: 10, marginBottom: 12, backgroundColor: '#07152F', borderRadius: 18, borderWidth: 1, borderColor: '#AA8743' },
+brandLogo: { width: 148, height: 68 },
 brandActions: { flexDirection: 'row', alignItems: 'center', gap: 4 },
 brandStaff: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 8 },
-brandStaffText: { color: '#946D25', fontSize: 10, fontWeight: '700' },
+brandStaffText: { color: '#E8C977', fontSize: 10, fontWeight: '700' },
 brandAccount: { minWidth: 44, minHeight: 44, paddingHorizontal: 8, alignItems: 'center', justifyContent: 'center' },
-brandAccountText: { color: '#102B62', fontSize: 11, fontWeight: '700' },
+brandAccountText: { color: '#FFF5D9', fontSize: 11, fontWeight: '700' },
 hero: { minHeight: 224, backgroundColor: '#102B62', borderRadius: 20, padding: 18, overflow: 'hidden', flexDirection: 'row', alignItems: 'center', marginBottom: 14 },
 heroCopyBlock: { flex: 1, zIndex: 1 },
 heroKicker: { color: '#E8C977', fontSize: 8, letterSpacing: 1.4, fontWeight: '800' },
@@ -542,10 +574,6 @@ adviserChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 5, marginTop: 10 },
 adviserChip: { minHeight: 34, paddingHorizontal: 10, borderRadius: 17, justifyContent: 'center', backgroundColor: '#FFFDF9', borderWidth: 1, borderColor: '#D9C7AC' },
 adviserChipText: { color: '#5D4C3E', fontSize: 10, fontWeight: '700' },
 robotFrame: { width: 92, height: 122, borderRadius: 16, backgroundColor: '#FFFFFF', overflow: 'hidden', justifyContent: 'center', alignItems: 'center' },
-agentEyelid: { position: 'absolute', backgroundColor: '#244A8B', borderRadius: 99, alignItems: 'center', justifyContent: 'center' },
-agentClosedEye: { width: '74%', height: 1.5, backgroundColor: '#D9B96C', borderRadius: 3 },
-agentThinkingGlow: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderWidth: 2, borderColor: '#D7AD56', borderRadius: 16 },
-agentHeaderIdentity: { flexDirection: 'row', alignItems: 'center', gap: 10, flexShrink: 1 },
 robotImage: { width: '100%', height: '100%' },
 adviserCardStack: { flexDirection: 'column', alignItems: 'stretch' },
 adviserWordsStack: { width: '100%', paddingRight: 0 },
@@ -558,22 +586,22 @@ sectionSub: { color: '#9B968E', fontSize: 11, marginTop: 4 },
 seeAllButton: { minHeight: 44, justifyContent: 'center', paddingLeft: 8 },
 seeAll: { color: '#946D25', fontWeight: '800', fontSize: 11 },
 rowList: { gap: 12, paddingBottom: 10 },
-card: { width: 188, backgroundColor: '#FFFDF9', borderRadius: 16, overflow: 'hidden', marginRight: 0 },
-productImage: { height: 158, backgroundColor: '#F0E9DE', justifyContent: 'center', alignItems: 'center', position: 'relative' },
-cardTag: { position: 'absolute', top: 10, left: 10, fontSize: 8, color: '#946D25', fontWeight: '800', letterSpacing: .5 },
+card: { width: 188, backgroundColor: '#08172F', borderRadius: 18, overflow: 'hidden', marginRight: 0, borderWidth: 1, borderColor: '#98753D', shadowColor: '#000', shadowOpacity: 0.18, shadowRadius: 8, elevation: 4 },
+productImage: { height: 166, backgroundColor: '#0D2348', justifyContent: 'center', alignItems: 'center', position: 'relative', borderBottomWidth: 1, borderBottomColor: '#765D35' },
+cardTag: { position: 'absolute', top: 9, left: 10, fontSize: 10, color: '#F5D583', fontWeight: '800', letterSpacing: .5, zIndex: 2 },
 heart: { position: 'absolute', right: 10, top: 7, color: '#716A62', fontSize: 21 },
-cardBody: { padding: 12 },
-productName: { color: '#102B62', fontSize: 13, fontWeight: '700', flexShrink: 1, minWidth: 0 },
+cardBody: { padding: 11, paddingTop: 10 },
+productName: { color: '#FFFFFF', fontSize: 14, fontWeight: '700', minHeight: 35, flexShrink: 1 },
 price: { color: '#946D25', fontWeight: '700', fontSize: 11, flexShrink: 1, width: '100%' },
-family: { color: '#8D867D', fontSize: 10, marginTop: 4 },
+family: { color: '#D4C7B0', fontSize: 10, marginTop: 3 },
 notes: { color: '#B1AAA1', fontSize: 9, marginTop: 6 },
 bottleWrapSmall: { height: 120 },
 productPhotoSmall: { width: 125, height: 116, borderRadius: 10 },
 capSmall: { width: 26, height: 23 },
 bottleSmall: { width: 52, height: 78, borderRadius: 6 },
 bottleMarkSmall: { fontSize: 20 },
-app: { flex: 1, width: '100%', maxWidth: 760, alignSelf: 'center', backgroundColor: '#FBF7EF' },
-page: { padding: 24, paddingBottom: 110 },
+app: { flex: 1, width: '100%', maxWidth: 760, alignSelf: 'center', backgroundColor: '#F8F4EC' },
+page: { padding: 17, paddingBottom: 110 },
 top: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 26 },
 eyebrow: { fontSize: 10, letterSpacing: 2, color: '#946D25', fontWeight: '700' },
 heading: { color: '#102B62', fontSize: 25, fontWeight: '500', marginTop: 6, letterSpacing: -1 },
@@ -663,11 +691,11 @@ profileSub: { color: '#9C958C', marginTop: 7 },
 menu: { backgroundColor: '#FFFDF9', padding: 19, borderBottomWidth: 1, borderBottomColor: '#F0ECE6', flexDirection: 'row', justifyContent: 'space-between' },
 menuText: { color: '#4D4640', fontSize: 14 },
 chevron: { color: '#B4ACA2', fontSize: 22 },
-nav: { flexShrink: 0, minHeight: 76, backgroundColor: '#FFFCF7', borderTopWidth: 1, borderTopColor: '#EEE8DF', flexDirection: 'row', justifyContent: 'space-around', paddingTop: 11, paddingBottom: 8 },
+nav: { flexShrink: 0, minHeight: 76, backgroundColor: '#08172F', borderTopWidth: 1, borderTopColor: '#A37E43', flexDirection: 'row', justifyContent: 'space-around', paddingTop: 11, paddingBottom: 8 },
 navItem: { alignItems: 'center', justifyContent: 'center', minWidth: 64, minHeight: 52, flex: 1, paddingHorizontal: 3 },
-navIcon: { color: '#B5ADA3', fontSize: 22, height: 28 },
-navLabel: { color: '#A7A097', fontSize: 10, marginTop: 3, textAlign: 'center', flexShrink: 1 },
-navActive: { color: '#946D25', fontWeight: '700' },
+navIcon: { color: '#D5C8AC', fontSize: 22, height: 28 },
+navLabel: { color: '#D5C8AC', fontSize: 10, marginTop: 3, textAlign: 'center', flexShrink: 1 },
+navActive: { color: '#F2CB70', fontWeight: '700' },
 pressed: { opacity: .78 },
 detail: { flex: 1, padding: 24, backgroundColor: '#FBF7EF' },
 back: { color: '#8F694A', fontSize: 14, marginBottom: 15 },
