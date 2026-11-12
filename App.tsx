@@ -2,7 +2,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect, useRef, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createClient } from '@supabase/supabase-js';
-import { Image, Linking, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
+import { AccessibilityInfo, Animated, Image, Linking, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import './global.css';
 import AdminRoute from './AdminRoute';
@@ -96,6 +96,7 @@ const HOME_NOTICE = 'NOVA မှ ကြိုဆိုပါတယ် · သင�
 type Showcase = { title: string; description: string; image_url: string | null; cta: 'discover' | 'advisor'; updated_at?: string };
 function LiveShowcase({ go }: { go: (t: Tab) => void }) {
   const [board, setBoard] = useState<Showcase | null>(null);
+  const [activeSlide, setActiveSlide] = useState(0);
   useEffect(() => {
     let active = true;
     const load = async () => {
@@ -104,21 +105,108 @@ function LiveShowcase({ go }: { go: (t: Tab) => void }) {
         if (!response.ok) return;
         const payload = await response.json();
         if (active) setBoard(payload.board || null);
-      } catch { /* Preview can still show its normal homepage without the board. */ }
+      } catch { /* Show local NOVA collection slides when the event feed is unavailable. */ }
     };
     load();
     const timer = setInterval(load, 30000);
     return () => { active = false; clearInterval(timer); };
   }, []);
-  if (!board) return null;
-  return <View style={{ marginTop: 16, backgroundColor: '#FFFFFF', borderRadius: 16, borderWidth: 1, borderColor: '#E5E0D6', padding: 15 }}>
-    <Text style={{ color: '#A17A2C', fontSize: 10, fontWeight: '800', letterSpacing: 1 }}>NOVA · LIVE SHOWCASE</Text>
-    {board.image_url ? <Image source={{ uri: board.image_url }} resizeMode="contain" style={{ width: '100%', height: 180, marginTop: 8 }} /> : null}
-    <Text style={{ color: '#102856', fontSize: 19, fontWeight: '700', marginTop: 9 }}>{board.title}</Text>
-    <Text style={{ color: '#34435B', marginTop: 5, lineHeight: 21 }}>{board.description}</Text>
-    <Pressable accessibilityRole="button" onPress={() => go(board.cta)} style={{ backgroundColor: '#102856', borderRadius: 10, padding: 12, marginTop: 12, alignSelf: 'flex-start' }}><Text style={{ color: '#FFFFFF', fontWeight: '700' }}>{board.cta === 'advisor' ? 'Ask NOVA →' : 'Explore Scents →'}</Text></Pressable>
+  const slides = [
+    ...(board ? [{ id: 'event', title: board.title, description: board.description, image: board.image_url ? { uri: board.image_url } : productImages['NV-001'], cta: board.cta }] : []),
+    { id: 'nv001', title: 'NOVA Blue Essence', description: 'NV-001 · Fresh Woody · Daily & Office', image: productImages['NV-001'], cta: 'discover' as Tab },
+    { id: 'nv003', title: 'NOVA Y Signature', description: 'NV-003 · Citrus Woody · Signature Scent', image: productImages['NV-003'], cta: 'discover' as Tab },
+    { id: 'nv015', title: 'NOVA Sauvage Wild', description: 'NV-015 · Aromatic Fougere · Bold & Fresh', image: productImages['NV-015'], cta: 'discover' as Tab },
+  ];
+  useEffect(() => {
+    const timer = setInterval(() => setActiveSlide(index => (index + 1) % slides.length), 4500);
+    return () => clearInterval(timer);
+  }, [slides.length]);
+  const slide = slides[activeSlide % slides.length];
+  return <View style={s.showcaseCard}>
+    <Text style={s.showcaseKicker}>NOVA · EVENTS & HIGHLIGHTS</Text>
+    <View style={s.showcaseMain}>
+      <View style={s.showcaseWords}>
+        <Text style={s.showcaseTitle}>{slide.title}</Text>
+        <Text style={s.showcaseCopy}>{slide.description}</Text>
+        <Pressable accessibilityRole="button" accessibilityLabel={slide.cta === 'advisor' ? 'Ask NOVA AI Agent' : 'Explore NOVA collection'} onPress={() => go(slide.cta)} style={s.showcaseButton}><Text style={s.showcaseButtonText}>{slide.cta === 'advisor' ? 'Ask NOVA AI Agent →' : 'Explore Collection →'}</Text></Pressable>
+      </View>
+      <Image source={slide.image} resizeMode="contain" style={s.showcaseImage} accessibilityLabel={slide.title} />
+    </View>
+    <View style={s.showcaseDots}>{slides.map((item, index) => <Pressable key={item.id} accessibilityRole="button" accessibilityLabel={`Show highlight ${index + 1}`} onPress={() => setActiveSlide(index)} style={[s.showcaseDot, index === activeSlide % slides.length && s.showcaseDotActive]} />)}</View>
   </View>;
 }
+// Living NOVA mascot: animate the authentic robot image without changing the AI backend.
+function LivingNovaAgent({ size = 92, thinking = false, compact = false }: { size?: number; thinking?: boolean; compact?: boolean }) {
+  const blink = useRef(new Animated.Value(0)).current;
+  const float = useRef(new Animated.Value(0)).current;
+  const glow = useRef(new Animated.Value(0.25)).current;
+  const [reduceMotion, setReduceMotion] = useState(false);
+  const height = size * 765 / 800;
+
+  useEffect(() => {
+    let mounted = true;
+    AccessibilityInfo.isReduceMotionEnabled()
+      .then(enabled => { if (mounted) setReduceMotion(enabled); })
+      .catch(() => {});
+    return () => { mounted = false; };
+  }, []);
+
+  useEffect(() => {
+    if (reduceMotion) {
+      blink.stopAnimation(); float.stopAnimation(); glow.stopAnimation();
+      blink.setValue(0); float.setValue(0); glow.setValue(0.25);
+      return;
+    }
+    // Two natural blinks, followed by a longer pause. The image stays recognizable.
+    const blinkLoop = Animated.loop(Animated.sequence([
+      Animated.delay(2600),
+      Animated.timing(blink, { toValue: 1, duration: 95, useNativeDriver: true }),
+      Animated.delay(110),
+      Animated.timing(blink, { toValue: 0, duration: 125, useNativeDriver: true }),
+      Animated.delay(170),
+      Animated.timing(blink, { toValue: 1, duration: 80, useNativeDriver: true }),
+      Animated.delay(85),
+      Animated.timing(blink, { toValue: 0, duration: 110, useNativeDriver: true }),
+      Animated.delay(3400),
+    ]));
+    blinkLoop.start();
+    const floatLoop = compact ? null : Animated.loop(Animated.sequence([
+      Animated.timing(float, { toValue: -2, duration: 1800, useNativeDriver: true }),
+      Animated.timing(float, { toValue: 1, duration: 1800, useNativeDriver: true }),
+    ]));
+    floatLoop?.start();
+    return () => { blinkLoop.stop(); floatLoop?.stop(); };
+  }, [blink, float, glow, compact, reduceMotion]);
+
+  useEffect(() => {
+    if (reduceMotion || !thinking) {
+      glow.stopAnimation();
+      glow.setValue(0.25);
+      return;
+    }
+    const thinkingLoop = Animated.loop(Animated.sequence([
+      Animated.timing(glow, { toValue: 0.95, duration: 520, useNativeDriver: true }),
+      Animated.timing(glow, { toValue: 0.25, duration: 520, useNativeDriver: true }),
+    ]));
+    thinkingLoop.start();
+    return () => thinkingLoop.stop();
+  }, [glow, thinking, reduceMotion]);
+
+  return <View accessible accessibilityRole="image" accessibilityLabel={thinking ? 'NOVA AI Agent is thinking' : 'NOVA AI Agent, animated robot mascot'} style={{ width: size, height, overflow: 'visible' }}>
+    <Animated.View style={{ width: size, height, transform: [{ translateY: float }] }}>
+      <Image source={require('./assets/nova-ai-robot.jpg')} resizeMode="stretch" style={{ width: size, height }} accessible={false} />
+      {/* The two eyelids briefly cover the glowing eyes in the original artwork. */}
+      <Animated.View pointerEvents="none" style={[s.agentEyelid, { left: '36.2%', top: '29.9%', width: '10%', height: '10.5%', opacity: blink }]}>
+        <View style={s.agentClosedEye} />
+      </Animated.View>
+      <Animated.View pointerEvents="none" style={[s.agentEyelid, { left: '57.4%', top: '32.3%', width: '10%', height: '10.5%', opacity: blink }]}>
+        <View style={s.agentClosedEye} />
+      </Animated.View>
+      {thinking ? <Animated.View pointerEvents="none" style={[s.agentThinkingGlow, { opacity: glow }]} /> : null}
+    </Animated.View>
+  </View>;
+}
+
 function Home({ go, pick }: { go: (t: Tab) => void; pick: (p: Product) => void }) {
   const { width, fontScale } = useWindowDimensions();
   const heroStack = width < 360 || fontScale > 1.2;
@@ -127,10 +215,10 @@ function Home({ go, pick }: { go: (t: Tab) => void; pick: (p: Product) => void }
   return <ScrollView contentContainerStyle={s.homePage} showsVerticalScrollIndicator={false}>
     <View style={s.notice} accessibilityRole="text"><Text style={s.noticeLabel}>NOTICE</Text><Text style={s.noticeCopy}>{shopPricing.priceLabel} · {shopPricing.paymentLabel}</Text></View>
     <View style={s.homeContent}>
-      <View style={s.brandRow}><Image source={require('./assets/nova-logo-authentic.png')} style={s.brandLogo} resizeMode="contain" accessibilityLabel="NOVA" /><Pressable accessibilityRole="button" accessibilityLabel="Open your NOVA account" onPress={() => go('profile')} style={s.brandAccount}><Text style={s.brandAccountText}>Account</Text></Pressable></View>
-      <View style={[s.hero, heroStack && s.heroStack]}><View style={[s.heroCopyBlock, heroStack && s.heroCopyStack]}><Text style={s.heroKicker}>NOVA FRAGRANCE</Text><Text style={s.heroTitle}>Your scent.{`\n`}Your story.</Text><Text style={s.heroCopy}>သင့်ရဲ့ စတိုင်နဲ့ လိုက်ဖက်မယ့် ရနံ့ကို ရှာဖွေလိုက်ပါ။</Text><Pressable accessibilityRole="button" accessibilityLabel="Explore NOVA scents" onPress={() => go('discover')} style={s.heroButton}><Text style={s.heroButtonText}>Explore scents  →</Text></Pressable></View><Image source={require('./assets/nova-perfume-set.png')} style={[s.heroImage, heroStack && s.heroImageStack]} resizeMode="contain" accessibilityLabel="NOVA perfume set" /></View>
+      <View style={s.brandRow}><Image source={require('./assets/nova-logo-authentic.png')} style={s.brandLogo} resizeMode="contain" accessibilityLabel="NOVA" /><View style={s.brandActions}>{Platform.OS === 'web' ? <Pressable accessibilityRole="button" accessibilityLabel="Staff login" onPress={() => { if (typeof window !== 'undefined') window.location.assign('/admin'); }} style={s.brandStaff}><Text style={s.brandStaffText}>Staff Login</Text></Pressable> : null}<Pressable accessibilityRole="button" accessibilityLabel="Open your NOVA account" onPress={() => go('profile')} style={s.brandAccount}><Text style={s.brandAccountText}>Account</Text></Pressable></View></View>
       <LiveShowcase go={go} />
-      <View style={[s.adviserCard, adviserStack && s.adviserCardStack]}><View style={[s.adviserWords, adviserStack && s.adviserWordsStack]}><Text style={s.adviserKicker}>A LITTLE HELP, FROM NOVA</Text><Text style={s.adviserTitle}>Meet your Scent Adviser</Text><Text style={s.adviserCopy}>မေးလိုက်ပါ။ သင့်စိတ်ခံစားချက်နဲ့ အချိန်အခါအလိုက် ရနံ့ရွေးပေးမယ်။</Text><View style={s.adviserChips}>{adviserChips.map(chip => <Pressable key={chip} accessibilityRole="button" accessibilityLabel={`Ask NOVA about ${chip} scents`} onPress={() => go('advisor')} style={s.adviserChip}><Text style={s.adviserChipText}>{chip}</Text></Pressable>)}</View><Pressable accessibilityRole="button" accessibilityLabel="Ask NOVA Scent Adviser" onPress={() => go('advisor')} style={s.adviserCta}><Text style={s.adviserCtaText}>Ask NOVA  →</Text></Pressable></View><View style={[s.robotFrame, adviserStack && s.robotFrameStack]}><Image source={require('./assets/nova-ai-robot.jpg')} style={s.robotImage} resizeMode="contain" accessible={false} /></View></View>
+      <View style={[s.hero, heroStack && s.heroStack]}><View style={[s.heroCopyBlock, heroStack && s.heroCopyStack]}><Text style={s.heroKicker}>NOVA FRAGRANCE</Text><Text style={s.heroTitle}>Your scent.{`\n`}Your story.</Text><Text style={s.heroCopy}>သင့်ရဲ့ စတိုင်နဲ့ လိုက်ဖက်မယ့် ရနံ့ကို ရှာဖွေလိုက်ပါ။</Text><Pressable accessibilityRole="button" accessibilityLabel="Explore NOVA scents" onPress={() => go('discover')} style={s.heroButton}><Text style={s.heroButtonText}>Explore scents  →</Text></Pressable></View><Image source={require('./assets/nova-perfume-set.png')} style={[s.heroImage, heroStack && s.heroImageStack]} resizeMode="contain" accessibilityLabel="NOVA perfume set" /></View>
+      <View style={[s.adviserCard, adviserStack && s.adviserCardStack]}><Pressable accessibilityRole="button" accessibilityLabel="Chat with NOVA AI Agent" onPress={() => go('advisor')} style={[s.robotFrame, adviserStack && s.robotFrameStack]}><LivingNovaAgent size={adviserStack ? 145 : 92} /></Pressable><View style={[s.adviserWords, adviserStack && s.adviserWordsStack]}><Text style={s.adviserKicker}>A LITTLE HELP, FROM NOVA</Text><Text style={s.adviserTitle}>Meet NOVA AI Agent</Text><Text style={s.adviserCopy}>မေးလိုက်ပါ။ သင့်စိတ်ခံစားချက်နဲ့ အချိန်အခါအလိုက် ရနံ့ရွေးပေးမယ်။</Text><View style={s.adviserChips}>{adviserChips.map(chip => <Pressable key={chip} accessibilityRole="button" accessibilityLabel={`Ask NOVA about ${chip} scents`} onPress={() => go('advisor')} style={s.adviserChip}><Text style={s.adviserChipText}>{chip}</Text></Pressable>)}</View><Pressable accessibilityRole="button" accessibilityLabel="Ask NOVA AI Agent" onPress={() => go('advisor')} style={s.adviserCta}><Text style={s.adviserCtaText}>Ask NOVA  →</Text></Pressable></View></View>
       <View style={s.sectionHead}><View><Text style={s.sectionTitle}>Find your favourite</Text><Text style={s.sectionSub}>NOVA ရနံ့များကို ရှာဖွေပါ</Text></View><Pressable accessibilityRole="button" accessibilityLabel="See all NOVA scents" onPress={() => go('discover')} style={s.seeAllButton}><Text style={s.seeAll}>See all  →</Text></Pressable></View>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.rowList}>{products.slice(0, 3).map(p => <Card key={p.id} p={p} onPress={() => pick(p)} />)}</ScrollView>
     </View>
@@ -172,7 +260,7 @@ const isAdvisorResponse = (value: unknown): value is { reply: string; profile?: 
 
 function Advisor({ pick }: { pick: (p: Product) => void }) {
   const [input, setInput] = useState(''); const [loading, setLoading] = useState(false); const [profile, setProfile] = useState<FragranceProfile>(emptyProfile); const [profileId, setProfileId] = useState(''); const [purchaseHistory, setPurchaseHistory] = useState<PurchaseHistory[]>([]);
-  const [messages, setMessages] = useState<Message[]>([{ id: '1', from: 'nova', text: 'မင်္ဂလာပါ။ NOVA Scent Adviser ပါ။ သင်နှစ်သက်တဲ့ ရနံ့၊ သုံးမယ့်အချိန်နဲ့ စိတ်ခံစားချက်ကို ပြောပြပါ။ သင့်အတွက် လိုက်ဖက်တဲ့ ရေမွှေးကို အတူရွေးကြမယ်။' }, { id: '2', from: 'nova', text: 'ဥပမာ — လန်းဆန်းတဲ့ ရနံ့လိုချင်တယ်၊ ရုံးတက်ဖို့ ရွေးပေးပါ၊ ဒါမှမဟုတ် ပန်းရနံ့ ကြိုက်တယ်လို့ မေးနိုင်ပါတယ်။' }]);
+  const [messages, setMessages] = useState<Message[]>([{ id: '1', from: 'nova', text: 'မင်္ဂလာပါ။ NOVA AI Agent ပါ။ သင်နှစ်သက်တဲ့ ရနံ့၊ သုံးမယ့်အချိန်နဲ့ စိတ်ခံစားချက်ကို ပြောပြပါ။ သင့်အတွက် လိုက်ဖက်တဲ့ ရေမွှေးကို အတူရွေးကြမယ်။' }, { id: '2', from: 'nova', text: 'ဥပမာ — လန်းဆန်းတဲ့ ရနံ့လိုချင်တယ်၊ ရုံးတက်ဖို့ ရွေးပေးပါ၊ ဒါမှမဟုတ် ပန်းရနံ့ ကြိုက်တယ်လို့ မေးနိုင်ပါတယ်။' }]);
   useEffect(() => { getProfileId().then(async id => { setProfileId(id); try { if (isCloudUser(id)) { const cloud = await loadCloudProfile(id); setProfile(cloud || emptyProfile); } else { setProfile(await loadGuestProfile(id)); } } catch {} }); }, []);
   useEffect(() => { if (isCloudUser(profileId)) loadCloudPurchases().then(setPurchaseHistory).catch(() => {}); }, [profileId]);
   const send = async () => {
@@ -237,7 +325,7 @@ function Advisor({ pick }: { pick: (p: Product) => void }) {
       }
     } finally { setLoading(false); }
   };
-  return <SafeAreaView style={s.advisor}><View style={s.advisorHead}><View><Text style={s.eyebrow}>NOVA INTELLIGENCE</Text><Text style={s.heading}>Scent Adviser</Text></View><Text style={s.online}>{loading ? 'THINKING…' : 'NOVA AI'}</Text></View><ScrollView contentContainerStyle={s.chat}><ProfileMemory profile={profile} />{messages.map(m => <View key={m.id} style={[s.bubble, m.from === 'user' && s.userBubble]}><Text style={[s.bubbleText, m.from === 'user' && s.userText]}>{m.text}</Text>{m.recommendations?.length ? <RecommendationStrip items={m.recommendations} pick={pick} /> : null}</View>)}{loading && <View style={s.bubble}><Text style={s.bubbleText}>Learning your preferences…</Text></View>}</ScrollView><View style={s.composer}><TextInput value={input} onChangeText={setInput} accessibilityLabel="Message NOVA Scent Adviser" placeholder="ရနံ့အကြောင်း မေးလိုက်ပါ…" placeholderTextColor="#9C968D" style={s.input} onSubmitEditing={send} returnKeyType="send" editable={!loading}/><Pressable accessibilityRole="button" accessibilityLabel="Send message" disabled={loading || !input.trim() || !profileId} onPress={send} style={s.send}><Text style={s.sendText}>↑</Text></Pressable></View></SafeAreaView>;
+  return <SafeAreaView style={s.advisor}><View style={s.advisorHead}><View style={s.agentHeaderIdentity}><LivingNovaAgent size={48} thinking={loading} /><View><Text style={s.eyebrow}>NOVA INTELLIGENCE</Text><Text style={s.heading}>NOVA AI Agent</Text></View></View><Text style={s.online}>{loading ? 'THINKING…' : 'NOVA AI'}</Text></View><ScrollView contentContainerStyle={s.chat}><ProfileMemory profile={profile} />{messages.map(m => <View key={m.id} style={m.from === 'nova' ? s.agentMessageRow : s.customerMessageRow}>{m.from === 'nova' ? <Image source={require('./assets/nova-ai-robot.jpg')} style={s.agentAvatar} resizeMode="contain" accessibilityLabel="NOVA AI Agent" /> : null}<View style={[s.bubble, m.from === 'user' && s.userBubble, m.from === 'nova' && s.agentSpeechBubble]}><Text style={[s.bubbleText, m.from === 'user' && s.userText]}>{m.text}</Text>{m.recommendations?.length ? <RecommendationStrip items={m.recommendations} pick={pick} /> : null}</View></View>)}{loading && <View style={s.bubble}><Text style={s.bubbleText}>Learning your preferences…</Text></View>}</ScrollView><View style={s.composer}><TextInput value={input} onChangeText={setInput} accessibilityLabel="Message NOVA AI Agent" placeholder="ရနံ့အကြောင်း မေးလိုက်ပါ…" placeholderTextColor="#9C968D" style={s.input} onSubmitEditing={send} returnKeyType="send" editable={!loading}/><Pressable accessibilityRole="button" accessibilityLabel="Send message" disabled={loading || !input.trim() || !profileId} onPress={send} style={s.send}><Text style={s.sendText}>↑</Text></Pressable></View></SafeAreaView>;
 }
 function Profile({ onSignOut }: { onSignOut: () => void }) {
   const [profile, setProfile] = useState<FragranceProfile>(emptyProfile);
@@ -273,6 +361,7 @@ function Profile({ onSignOut }: { onSignOut: () => void }) {
       </Pressable>
       {supportError ? <Text accessibilityRole="alert" style={s.profileSub}>{supportError}</Text> : null}
     </>}
+    {Platform.OS === 'web' ? <Pressable accessibilityRole="button" onPress={() => { if (typeof window !== 'undefined') window.location.assign('/admin'); }} style={s.menu}><Text style={s.menuText}>🔐  Staff Login</Text><Text style={s.chevron}>›</Text></Pressable> : null}
     <Pressable onPress={onSignOut} style={s.menu}><Text style={[s.menuText, { color: '#A35F4B' }]}>↪  Sign out</Text><Text style={s.chevron}>›</Text></Pressable></ScrollView>;
 }
 function AuthScreen({ onAuth }: { onAuth: (session: string) => void }) {
@@ -401,7 +490,7 @@ function StorefrontApp() {
     })();
     return () => { active = false; subscription?.unsubscribe(); };
   }, []);
- if (booting) return <SafeAreaView style={s.auth}><StatusBar style="dark" /></SafeAreaView>; const screen = tab === 'home' ? <Home go={setTab} pick={setSelected} /> : tab === 'discover' ? <Discover pick={setSelected} /> : tab === 'advisor' ? <Advisor pick={setSelected} /> : !session ? <AuthScreen onAuth={setSession} /> : <Profile onSignOut={async () => { if (supabase) await supabase.auth.signOut(); await AsyncStorage.removeItem('@nova/local-session'); setTab('home'); setSelected(null); setSession(null); }} />; return <SafeAreaView style={s.app}><StatusBar style="dark" />{screen}<View style={s.nav}>{([['home', '⌂', 'Home'], ['discover', '◒', 'Discover'], ['advisor', '✦', 'Advisor'], ['profile', '○', 'Profile']] as const).map(([key, icon, label]) => <Pressable key={key} onPress={() => setTab(key)} style={s.navItem}><Text style={[s.navIcon, tab === key && s.navActive]}>{icon}</Text><Text style={[s.navLabel, tab === key && s.navActive]}>{label}</Text></Pressable>)}</View><Modal visible={Boolean(selected)} animationType="slide" onRequestClose={() => {}}>{selected ? <Detail key={selected.id} p={selected} close={() => setSelected(null)} /> : null}</Modal></SafeAreaView>; }
+ if (booting) return <SafeAreaView style={s.auth}><StatusBar style="dark" /></SafeAreaView>; const screen = tab === 'home' ? <Home go={setTab} pick={setSelected} /> : tab === 'discover' ? <Discover pick={setSelected} /> : tab === 'advisor' ? <Advisor pick={setSelected} /> : !session ? <AuthScreen onAuth={setSession} /> : <Profile onSignOut={async () => { if (supabase) await supabase.auth.signOut(); await AsyncStorage.removeItem('@nova/local-session'); setTab('home'); setSelected(null); setSession(null); }} />; return <SafeAreaView style={s.app}><StatusBar style="dark" />{screen}<View style={s.nav}>{([['home', '⌂', 'Home'], ['discover', '◒', 'Discover'], ['advisor', '✦', 'AI Agent'], ['profile', '○', 'Profile']] as const).map(([key, icon, label]) => <Pressable key={key} onPress={() => setTab(key)} style={s.navItem}>{key === 'advisor' ? <LivingNovaAgent size={32} compact /> : <Text style={[s.navIcon, tab === key && s.navActive]}>{icon}</Text>}<Text style={[s.navLabel, tab === key && s.navActive]}>{label}</Text></Pressable>)}</View><Modal visible={Boolean(selected)} animationType="slide" onRequestClose={() => {}}>{selected ? <Detail key={selected.id} p={selected} close={() => setSelected(null)} /> : null}</Modal></SafeAreaView>; }
 
 export default function App() {
   const isAdminRoute = Platform.OS === 'web' && typeof window !== 'undefined' && window.location.pathname.replace(/\/+$/, '') === '/admin';
@@ -409,6 +498,18 @@ export default function App() {
 }
 
 const s = StyleSheet.create({
+showcaseCard: { backgroundColor: '#102B62', borderRadius: 20, padding: 16, marginBottom: 14, overflow: 'hidden' },
+showcaseKicker: { color: '#E8C977', fontSize: 9, letterSpacing: 1.2, fontWeight: '800' },
+showcaseMain: { minHeight: 190, flexDirection: 'row', alignItems: 'center' },
+showcaseWords: { flex: 1, paddingRight: 6 },
+showcaseTitle: { color: '#FFF9ED', fontSize: 21, lineHeight: 26, fontWeight: '700' },
+showcaseCopy: { color: '#E3E7EF', fontSize: 11, lineHeight: 18, marginTop: 8 },
+showcaseImage: { width: '44%', height: 178 },
+showcaseButton: { marginTop: 12, backgroundColor: '#E8C977', borderRadius: 10, paddingVertical: 11, paddingHorizontal: 10, alignSelf: 'flex-start' },
+showcaseButtonText: { color: '#102B62', fontSize: 10, fontWeight: '800' },
+showcaseDots: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, paddingTop: 4, paddingBottom: 2 },
+showcaseDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#7586A7' },
+showcaseDotActive: { width: 19, backgroundColor: '#E8C977' },
 homePage: { paddingBottom: 24 },
 notice: { backgroundColor: '#102B62', paddingHorizontal: 16, paddingVertical: 8, minHeight: 34, flexDirection: 'row', alignItems: 'center', gap: 8 },
 noticeLabel: { color: '#E8C977', fontSize: 8, letterSpacing: 1.2, fontWeight: '800', flexShrink: 1 },
@@ -416,6 +517,9 @@ noticeCopy: { color: '#FFF9ED', fontSize: 10, lineHeight: 16, flex: 1 },
 homeContent: { paddingHorizontal: 18 },
 brandRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: 14, paddingBottom: 12 },
 brandLogo: { width: 112, height: 34 },
+brandActions: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+brandStaff: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 8 },
+brandStaffText: { color: '#946D25', fontSize: 10, fontWeight: '700' },
 brandAccount: { minWidth: 44, minHeight: 44, paddingHorizontal: 8, alignItems: 'center', justifyContent: 'center' },
 brandAccountText: { color: '#102B62', fontSize: 11, fontWeight: '700' },
 hero: { minHeight: 224, backgroundColor: '#102B62', borderRadius: 20, padding: 18, overflow: 'hidden', flexDirection: 'row', alignItems: 'center', marginBottom: 14 },
@@ -430,18 +534,22 @@ heroImageStack: { width: '100%', maxWidth: 230, height: 150, alignSelf: 'center'
 heroButton: { minHeight: 44, alignSelf: 'flex-start', justifyContent: 'center', paddingHorizontal: 14, borderRadius: 10, backgroundColor: '#E8C977', marginTop: 13 },
 heroButtonText: { color: '#102B62', fontSize: 11, fontWeight: '800' },
 adviserCard: { backgroundColor: '#F2E9DA', borderRadius: 18, padding: 15, minHeight: 174, flexDirection: 'row', alignItems: 'center', overflow: 'hidden', marginBottom: 26, borderWidth: 1, borderColor: '#E4D6C2' },
-adviserWords: { flex: 1, paddingRight: 8 },
+adviserWords: { flex: 1, paddingLeft: 10 },
 adviserKicker: { color: '#946D25', fontSize: 8, letterSpacing: 1.1, fontWeight: '800' },
 adviserTitle: { color: '#102B62', fontSize: 19, lineHeight: 24, fontWeight: '700', marginTop: 6 },
 adviserCopy: { color: '#665D55', fontSize: 11, lineHeight: 17, marginTop: 6 },
 adviserChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 5, marginTop: 10 },
 adviserChip: { minHeight: 34, paddingHorizontal: 10, borderRadius: 17, justifyContent: 'center', backgroundColor: '#FFFDF9', borderWidth: 1, borderColor: '#D9C7AC' },
 adviserChipText: { color: '#5D4C3E', fontSize: 10, fontWeight: '700' },
-robotFrame: { width: 92, height: 122, borderRadius: 16, backgroundColor: '#FFFFFF', overflow: 'hidden' },
+robotFrame: { width: 92, height: 122, borderRadius: 16, backgroundColor: '#FFFFFF', overflow: 'hidden', justifyContent: 'center', alignItems: 'center' },
+agentEyelid: { position: 'absolute', backgroundColor: '#244A8B', borderRadius: 99, alignItems: 'center', justifyContent: 'center' },
+agentClosedEye: { width: '74%', height: 1.5, backgroundColor: '#D9B96C', borderRadius: 3 },
+agentThinkingGlow: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderWidth: 2, borderColor: '#D7AD56', borderRadius: 16 },
+agentHeaderIdentity: { flexDirection: 'row', alignItems: 'center', gap: 10, flexShrink: 1 },
 robotImage: { width: '100%', height: '100%' },
 adviserCardStack: { flexDirection: 'column', alignItems: 'stretch' },
 adviserWordsStack: { width: '100%', paddingRight: 0 },
-robotFrameStack: { width: '100%', height: 150, marginTop: 12 },
+robotFrameStack: { width: '100%', height: 150, marginBottom: 12 },
 adviserCta: { minHeight: 44, alignSelf: 'flex-start', justifyContent: 'center', marginTop: 8, paddingHorizontal: 2 },
 adviserCtaText: { color: '#102B62', fontSize: 12, fontWeight: '800' },
 sectionHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 12 },
@@ -500,7 +608,11 @@ gridSingle: { justifyContent: 'flex-start' },
 advisor: { flex: 1, backgroundColor: '#FBF7EF' },
 advisorHead: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 20, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
 online: { color: '#6D8B6F', fontSize: 10, letterSpacing: 1, fontWeight: '700' },
-chat: { padding: 24, paddingTop: 10, gap: 13, paddingBottom: 30 },
+chat: { padding: 18, paddingTop: 10, gap: 13, paddingBottom: 30 },
+agentMessageRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 8, alignSelf: 'flex-start', maxWidth: '100%' },
+customerMessageRow: { alignSelf: 'flex-end', maxWidth: '88%' },
+agentAvatar: { width: 42, height: 48, borderRadius: 12, backgroundColor: '#F2E9DA' },
+agentSpeechBubble: { flexShrink: 1, maxWidth: '82%' },
 bubble: { backgroundColor: '#F2EBDD', padding: 15, borderRadius: 18, borderBottomLeftRadius: 4, maxWidth: '88%' },
 userBubble: { backgroundColor: '#102B62', alignSelf: 'flex-end', borderBottomLeftRadius: 18, borderBottomRightRadius: 4 },
 bubbleText: { color: '#263D67', fontSize: 14, lineHeight: 21 },
