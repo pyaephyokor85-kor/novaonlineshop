@@ -6,6 +6,7 @@ import { AccessibilityInfo, Animated, Image, Linking, Modal, Platform, Pressable
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import './global.css';
 import AdminRoute from './AdminRoute';
+import { StorefrontMediaProvider, useStorefrontMedia } from './StorefrontMedia';
 import { novaCatalog } from './data/nova-catalog';
 import shopPricing from './data/shop-pricing.json';
 type BottleSize = keyof typeof shopPricing.sizes;
@@ -82,7 +83,10 @@ const productImages: Record<string, any> = {
 };
 
 function Bottle({ p, small = false }: { p: Product; small?: boolean }) {
-  if (productImages[p.id]) return <View style={[s.bottleWrap, small && s.bottleWrapSmall]}><Image source={productImages[p.id]} style={[s.productPhoto, small && s.productPhotoSmall]} resizeMode="contain" /></View>;
+  const rows = useStorefrontMedia();
+  const override = rows?.find(row => row.id === p.id && row.kind === 'product');
+  const source = override ? (!override.deleted && override.enabled && override.image_url ? { uri: override.image_url } : null) : productImages[p.id];
+  if (source) return <View style={[s.bottleWrap, small && s.bottleWrapSmall]}><Image source={source} style={[s.productPhoto, small && s.productPhotoSmall]} resizeMode="contain" /></View>;
   return <View style={[s.bottleWrap, small && s.bottleWrapSmall]}><View style={[s.cap, { backgroundColor: p.accent }, small && s.capSmall]} /><View style={[s.bottle, { backgroundColor: p.color }, small && s.bottleSmall]}><View style={s.shine} /><Text style={[s.bottleMark, small && s.bottleMarkSmall]}>N</Text>{!small && <Text style={s.bottleWord}>NOVA</Text>}</View></View>;
 }
 function Card({ p, onPress }: { p: Product; onPress: () => void }) {
@@ -95,6 +99,7 @@ function Card({ p, onPress }: { p: Product; onPress: () => void }) {
 const HOME_NOTICE = 'NOVA မှ ကြိုဆိုပါတယ် · သင့်အတွက် ရနံ့ကို အတူရွေးချယ်မယ်';
 type Showcase = { title: string; description: string; image_url: string | null; cta: 'discover' | 'advisor'; updated_at?: string };
 function LiveShowcase({ go }: { go: (t: Tab) => void }) {
+  const media = useStorefrontMedia();
   const [board, setBoard] = useState<Showcase | null>(null);
   const [activeSlide, setActiveSlide] = useState(0);
   useEffect(() => {
@@ -111,16 +116,17 @@ function LiveShowcase({ go }: { go: (t: Tab) => void }) {
     const timer = setInterval(load, 30000);
     return () => { active = false; clearInterval(timer); };
   }, []);
-  const slides = [
-    ...(board ? [{ id: 'event', title: board.title, description: board.description, image: board.image_url ? { uri: board.image_url } : productImages['NV-001'], cta: board.cta }] : []),
-    { id: 'nv001', title: 'NOVA Blue Essence', description: 'NV-001 · Fresh Woody · Daily & Office', image: productImages['NV-001'], cta: 'discover' as Tab },
-    { id: 'nv003', title: 'NOVA Y Signature', description: 'NV-003 · Citrus Woody · Signature Scent', image: productImages['NV-003'], cta: 'discover' as Tab },
-    { id: 'nv015', title: 'NOVA Sauvage Wild', description: 'NV-015 · Aromatic Fougere · Bold & Fresh', image: productImages['NV-015'], cta: 'discover' as Tab },
+  const managedSlides = media?.filter(row => row.kind === 'slide' && row.enabled && !row.deleted);
+  const slides = media !== null ? (managedSlides || []).map(row => ({ id: row.id, title: row.title, description: row.description, image: { uri: row.image_url! }, cta: row.cta as Tab })) : [
+    ...(board ? [{ id: 'event', title: board.title, description: board.description, image: board.image_url ? { uri: board.image_url } : require('./assets/nova-perfume-set.png'), cta: board.cta as Tab }] : []),
+    { id: 'collection', title: 'NOVA Inspired Perfume', description: 'သင့်စိတ်ကြိုက် ရနံ့ကို ရွေးလိုက်ပါ။', image: require('./assets/nova-perfume-set.png'), cta: 'discover' as Tab },
   ];
   useEffect(() => {
+    if (!slides.length) return;
     const timer = setInterval(() => setActiveSlide(index => (index + 1) % slides.length), 4500);
     return () => clearInterval(timer);
   }, [slides.length]);
+  if (!slides.length) return null;
   const slide = slides[activeSlide % slides.length];
   return <View style={s.showcaseCard}>
     <Text style={s.showcaseKicker}>NOVA · EVENTS & HIGHLIGHTS</Text>
@@ -213,7 +219,6 @@ function Home({ go, pick }: { go: (t: Tab) => void; pick: (p: Product) => void }
   const adviserStack = width < 360 || fontScale > 1.2 || width > 700;
   const adviserChips = ['Fresh', 'For work', 'By mood'];
   return <ScrollView contentContainerStyle={s.homePage} showsVerticalScrollIndicator={false}>
-    <View style={s.notice} accessibilityRole="text"><Text style={s.noticeLabel}>NOTICE</Text><Text style={s.noticeCopy}>{shopPricing.priceLabel} · {shopPricing.paymentLabel}</Text></View>
     <View style={s.homeContent}>
       <View style={s.brandRow}><Image source={require('./assets/nova-logo-authentic.png')} style={s.brandLogo} resizeMode="contain" accessibilityLabel="NOVA" /><View style={s.brandActions}>{Platform.OS === 'web' ? <Pressable accessibilityRole="button" accessibilityLabel="Staff login" onPress={() => { if (typeof window !== 'undefined') window.location.assign('/admin'); }} style={s.brandStaff}><Text style={s.brandStaffText}>Staff Login</Text></Pressable> : null}<Pressable accessibilityRole="button" accessibilityLabel="Open your NOVA account" onPress={() => go('profile')} style={s.brandAccount}><Text style={s.brandAccountText}>Account</Text></Pressable></View></View>
       <LiveShowcase go={go} />
@@ -260,7 +265,7 @@ const isAdvisorResponse = (value: unknown): value is { reply: string; profile?: 
 
 function Advisor({ pick }: { pick: (p: Product) => void }) {
   const [input, setInput] = useState(''); const [loading, setLoading] = useState(false); const [profile, setProfile] = useState<FragranceProfile>(emptyProfile); const [profileId, setProfileId] = useState(''); const [purchaseHistory, setPurchaseHistory] = useState<PurchaseHistory[]>([]);
-  const [messages, setMessages] = useState<Message[]>([{ id: '1', from: 'nova', text: 'မင်္ဂလာပါ။ NOVA AI Agent ပါ။ သင်နှစ်သက်တဲ့ ရနံ့၊ သုံးမယ့်အချိန်နဲ့ စိတ်ခံစားချက်ကို ပြောပြပါ။ သင့်အတွက် လိုက်ဖက်တဲ့ ရေမွှေးကို အတူရွေးကြမယ်။' }, { id: '2', from: 'nova', text: 'ဥပမာ — လန်းဆန်းတဲ့ ရနံ့လိုချင်တယ်၊ ရုံးတက်ဖို့ ရွေးပေးပါ၊ ဒါမှမဟုတ် ပန်းရနံ့ ကြိုက်တယ်လို့ မေးနိုင်ပါတယ်။' }]);
+  const [messages, setMessages] = useState<Message[]>([{ id: '1', from: 'nova', text: 'မင်္ဂလာပါ ဘရို 😊 NOVA ပါ။ ဘာကူညီပေးရမလဲ။' }]);
   useEffect(() => { getProfileId().then(async id => { setProfileId(id); try { if (isCloudUser(id)) { const cloud = await loadCloudProfile(id); setProfile(cloud || emptyProfile); } else { setProfile(await loadGuestProfile(id)); } } catch {} }); }, []);
   useEffect(() => { if (isCloudUser(profileId)) loadCloudPurchases().then(setPurchaseHistory).catch(() => {}); }, [profileId]);
   const send = async () => {
@@ -431,8 +436,8 @@ function Detail({ p, close }: { p: Product; close: () => void }) {
       if (data.orderNumber) {
         const discountText = Number(data.discountAmount) > 0 ? ` Discount ${data.discountPercent}%: −${money(Number(data.discountAmount))}.` : '';
         const notificationText = data.notificationSent === false && !data.duplicate ? ' The order is saved in the Preview queue, but its Telegram notice was not sent.' : '';
-        setOrderStatus(`Order ${data.orderNumber} received. Subtotal ${money(Number(data.subtotal))}.${discountText} COD merchandise total ${money(Number(data.total))}; delivery fee is separate.${notificationText}`);
-      } else setOrderStatus('အော်ဒါတောင်းဆိုချက် ပို့ပြီးပါပြီ။ ပစ္စည်းရရှိမှုနဲ့ ပို့ခကို ဆိုင်က ဆက်သွယ်အတည်ပြုပေးပါမယ်။ COD — အိမ်ရောက်ငွေချေပါ။');
+        setOrderStatus(`Order ${data.orderNumber} received. Subtotal ${money(Number(data.subtotal))}.${discountText} COD total ${money(Number(data.total))}.${notificationText}`);
+      } else setOrderStatus('အော်ဒါတောင်းဆိုချက် ပို့ပြီးပါပြီ။ COD — အိမ်ရောက်ငွေချေပါ။');
       idempotencyKeyRef.current = '';
       setName(''); setPhone(''); setAddress(''); setQuantity('1'); setSize(null);
     } catch {
@@ -442,11 +447,11 @@ function Detail({ p, close }: { p: Product; close: () => void }) {
   const field = { backgroundColor: '#FFFDF9', borderWidth: 1, borderColor: '#E6DDD3', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, color: '#102B62', fontSize: 13, marginTop: 9 } as const;
   return <SafeAreaView style={s.detail}><ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 35 }}>
     <Pressable accessibilityRole="button" accessibilityLabel="Close order form" disabled={sending} onPress={close}><Text style={s.back}>‹ ပြန်သွားမယ် / ရေမွှေးပြောင်းရွေးမယ်</Text></Pressable>
-    <View style={s.detailVisual}><Bottle p={p} /></View>
+    <View style={[s.detailVisual, { height: 180 }]}><Bottle p={p} /></View>
     <Text style={s.eyebrow}>{p.id} · {p.family.toUpperCase()}</Text><Text style={s.detailTitle}>{p.name}</Text>
     <Text style={s.detailNotes}>{p.notes}</Text><Text style={s.detailDescription}>{p.bioMyanmar || p.family}</Text>
     <Text style={s.detailMeta}>{p.category} · {p.brand} · Inspired by {p.originalReference}</Text>
-    <Text style={{ color: '#946D25', fontSize: 13, fontWeight: '700', marginTop: 26 }}>အော်ဒါဖောင် · {p.id} — {p.name}</Text>
+    <Text style={{ color: '#946D25', fontSize: 13, fontWeight: '700', marginTop: 26 }}>မှာယူရန် · {p.id} — {p.name}</Text>
     <Text style={s.detailDescription}>ရေမွှေးအားလုံး {shopPricing.priceLabel} ပါ။</Text>
     <Text style={s.detailDescription}>အရွယ်အစား ရွေးပါ</Text>
     <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
@@ -463,9 +468,8 @@ function Detail({ p, close }: { p: Product; close: () => void }) {
       {discountPercent > 0 && discountAmount !== null ? <Text style={{ marginTop: 6, color: '#355F3C' }}>လျှော့ဈေး ({discountPercent}%): −{money(discountAmount)}</Text> : null}
       <Text accessibilityLiveRegion="polite" style={{ color: '#102B62', fontSize: 17, fontWeight: '700', marginTop: 8 }}>COD ပစ္စည်းစုစုပေါင်း: {codTotal === null ? '—' : money(codTotal)}</Text>
       <Text style={{ marginTop: 8 }}>{shopPricing.paymentLabel}</Text>
-      <Text style={{ marginTop: 8, lineHeight: 22 }}>ပို့ခ မပါသေးပါ။ ပစ္စည်းရရှိမှုနဲ့ ပို့ခကို ဆိုင်က ဆက်သွယ်အတည်ပြုပြီးမှ ပို့ပေးပါမယ်။</Text>
     </View>
-    <Pressable accessibilityRole="button" accessibilityLabel="Send COD order request" onPress={submitOrder} disabled={sending} style={[s.add, { marginTop: 16, alignItems: 'center', opacity: sending ? 0.6 : 1 }]}><Text style={s.addText}>{sending ? 'အော်ဒါပို့နေပါတယ်…' : 'COD အော်ဒါတောင်းဆိုချက် ပို့မယ် →'}</Text></Pressable>
+    <Pressable accessibilityRole="button" accessibilityLabel="Send COD order request" onPress={submitOrder} disabled={sending} style={[s.add, { marginTop: 16, alignItems: 'center', opacity: sending ? 0.6 : 1 }]}><Text style={s.addText}>{sending ? 'အော်ဒါပို့နေပါတယ်…' : 'အော်ဒါအတည်ပြုမယ် →'}</Text></Pressable>
     {orderStatus ? <Text accessibilityRole="alert" style={{ color: '#80583D', marginTop: 12, lineHeight: 22 }}>{orderStatus}</Text> : null}
   </ScrollView></SafeAreaView>;
 }
@@ -494,7 +498,7 @@ function StorefrontApp() {
 
 export default function App() {
   const isAdminRoute = Platform.OS === 'web' && typeof window !== 'undefined' && window.location.pathname.replace(/\/+$/, '') === '/admin';
-  return <SafeAreaProvider>{isAdminRoute ? <AdminRoute /> : <StorefrontApp />}</SafeAreaProvider>;
+  return <SafeAreaProvider>{isAdminRoute ? <AdminRoute /> : <StorefrontMediaProvider><StorefrontApp /></StorefrontMediaProvider>}</SafeAreaProvider>;
 }
 
 const s = StyleSheet.create({
@@ -515,13 +519,13 @@ notice: { backgroundColor: '#102B62', paddingHorizontal: 16, paddingVertical: 8,
 noticeLabel: { color: '#E8C977', fontSize: 8, letterSpacing: 1.2, fontWeight: '800', flexShrink: 1 },
 noticeCopy: { color: '#FFF9ED', fontSize: 10, lineHeight: 16, flex: 1 },
 homeContent: { paddingHorizontal: 18 },
-brandRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: 14, paddingBottom: 12 },
-brandLogo: { width: 112, height: 34 },
+brandRow: { backgroundColor: '#102B62', borderRadius: 16, alignItems: 'center', justifyContent: 'center', paddingTop: 18, paddingBottom: 12, marginBottom: 16, gap: 10 },
+brandLogo: { width: 160, height: 82 },
 brandActions: { flexDirection: 'row', alignItems: 'center', gap: 4 },
 brandStaff: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 8 },
-brandStaffText: { color: '#946D25', fontSize: 10, fontWeight: '700' },
+brandStaffText: { color: '#E8C977', fontSize: 10, fontWeight: '700' },
 brandAccount: { minWidth: 44, minHeight: 44, paddingHorizontal: 8, alignItems: 'center', justifyContent: 'center' },
-brandAccountText: { color: '#102B62', fontSize: 11, fontWeight: '700' },
+brandAccountText: { color: '#FFF9ED', fontSize: 11, fontWeight: '700' },
 hero: { minHeight: 224, backgroundColor: '#102B62', borderRadius: 20, padding: 18, overflow: 'hidden', flexDirection: 'row', alignItems: 'center', marginBottom: 14 },
 heroCopyBlock: { flex: 1, zIndex: 1 },
 heroKicker: { color: '#E8C977', fontSize: 8, letterSpacing: 1.4, fontWeight: '800' },
