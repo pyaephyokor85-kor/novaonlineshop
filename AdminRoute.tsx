@@ -31,9 +31,9 @@ export default function AdminRoute() {
     (async () => {
       try {
         const { data } = await client!.auth.getSession();
-        const response = await fetch('/api/admin/session', { headers: { Authorization: `Bearer ${data.session?.access_token || ''}` } });
+        const response = await fetch('/api/admin/orders', { headers: { Authorization: `Bearer ${data.session?.access_token || ''}` } });
         const result = await response.json();
-        if (!response.ok || result.authorized !== true) throw new Error(result.error || 'Admin ခွင့်ပြုချက် အတည်မပြုနိုင်ပါ။');
+        if (!response.ok || !Array.isArray(result.orders)) throw new Error(result.error || 'Admin ခွင့်ပြုချက် အတည်မပြုနိုင်ပါ။');
         if (active) setAuthorized(true);
       } catch (e: any) { if (active) setAccessError(e.message); }
       finally { if (active) setCheckingAccess(false); }
