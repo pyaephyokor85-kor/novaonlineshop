@@ -2,14 +2,15 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Platform, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { novaCatalog } from './data/nova-catalog';
 import { buildAddressLabelHtml, buildReceiptHtml } from './lib/print-templates.mjs';
-import { printBleOrder } from './lib/web-bluetooth-print.mjs';
 import type { SupabaseClient } from '@supabase/supabase-js';
+import AdminMedia from './AdminMedia';
+import OrderSlip from './OrderSlip';
 import shopPricing from './data/shop-pricing.json';
 
 const API_URL = (process.env.EXPO_PUBLIC_API_URL || '').replace(/\/$/, '');
 const endpoint = (path: string) => {
   if (Platform.OS !== 'web' && !API_URL) throw new Error('Set EXPO_PUBLIC_API_URL to your Preview API address.');
-  return `${API_URL}${path}`;
+  return `${Platform.OS === 'web' ? '' : API_URL}${path}`;
 };
 
 type OrderItem = { product_id: string; product_name: string; size: string; unit_price: number; quantity: number; line_total: number };
@@ -27,13 +28,14 @@ function PrintButton({ title, onPress, disabled = false }: { title: string; onPr
 }
 
 export default function AdminConsole({ onSignOut, authClient }: { onSignOut: () => void; authClient: SupabaseClient | null }) {
+  const [slipOrder, setSlipOrder] = useState<Order | null>(null);
   const [orders, setOrders] = useState<Order[]>([]);
   const [inventory, setInventory] = useState<Inventory[]>([]);
   const [adjustments, setAdjustments] = useState<InventoryAdjustment[]>([]);
   const [discountSetting, setDiscountSetting] = useState<DiscountSetting>({ enabled: false, percent: 0 });
   const [discountEnabled, setDiscountEnabled] = useState(false);
   const [discountPercent, setDiscountPercent] = useState('0');
-  const [section, setSection] = useState<'orders' | 'stock' | 'discount' | 'showcase'>('orders');
+  const [section, setSection] = useState<'orders' | 'stock' | 'discount' | 'showcase' | 'media'>('orders');
   const [showcaseTitle, setShowcaseTitle] = useState('');
   const [showcaseDescription, setShowcaseDescription] = useState('');
   const [showcaseImage, setShowcaseImage] = useState('');
@@ -47,15 +49,6 @@ export default function AdminConsole({ onSignOut, authClient }: { onSignOut: () 
   const [metric, setMetric] = useState<Record<string, Metric>>({});
   const [amount, setAmount] = useState<Record<string, string>>({});
   const [reason, setReason] = useState<Record<string, string>>({});
-  const [preparingThermer, setPreparingThermer] = useState('');
-  const [thermerLink, setThermerLink] = useState<{ orderId: string; href: string; expiresAt: number } | null>(null);
-
-  useEffect(() => {
-    if (!thermerLink) return;
-    const timer = setTimeout(() => setThermerLink(null), Math.max(0, thermerLink.expiresAt - Date.now()));
-    return () => clearTimeout(timer);
-  }, [thermerLink]);
-
   const api = useCallback(async (path: string, method = 'GET', body?: any) => {
     const sessionResult = await authClient?.auth.getSession();
     const token = sessionResult?.data.session?.access_token;
@@ -130,38 +123,9 @@ export default function AdminConsole({ onSignOut, authClient }: { onSignOut: () 
     const html = kind === 'receipt' ? buildReceiptHtml(order, width) : buildAddressLabelHtml(order, width);
     popup.document.open(); popup.document.write(html); popup.document.close();
   };
-  const printBluetooth = async (order: Order, kind: 'receipt' | 'label') => {
-    setError(''); setNotice('');
-    try {
-      await printBleOrder(order, kind);
-      setNotice(`${order.order_number}: data sent to Bluetooth printer. Verify paper output.`);
-    } catch (problem: any) { setError(problem?.message || 'Bluetooth printing failed.'); }
-  };
-  const prepareThermer = async (order: Order) => {
-    if (Platform.OS !== 'web' || typeof window === 'undefined') { setError('Thermer printing is available in the iPhone web Preview.'); return; }
-    setError(''); setNotice(''); setThermerLink(null); setPreparingThermer(order.id);
-    try {
-      const data = await api('/api/admin/print-ticket', 'POST', { orderId: order.id });
-      const expiresAt = Date.parse(data.expiresAt);
-      if (typeof data.token !== 'string' || !/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(data.token) || !Number.isFinite(expiresAt) || expiresAt <= Date.now() || data.paperWidth !== 80) throw new Error('The Preview server returned an invalid print link.');
-      const responseUrl = new URL(data.responseUrl);
-      if (responseUrl.protocol !== 'https:' || responseUrl.origin === window.location.origin || responseUrl.pathname !== '/api/receipt' || responseUrl.username || responseUrl.password || responseUrl.hash || responseUrl.searchParams.getAll('token').length !== 1 || responseUrl.searchParams.get('token') !== data.token || [...responseUrl.searchParams.keys()].some(key => key !== 'token')) throw new Error('The Preview server returned an invalid relay link.');
-      setThermerLink({ orderId: order.id, href: `bprint://${responseUrl.href}`, expiresAt });
-      setNotice(`${order.order_number}: tap Open Thermer within 2 minutes. Browser Print must be enabled in the app; select 80mm paper. Nothing has been printed yet.`);
-    } catch (problem: any) { setError(problem?.message || 'Could not prepare the Thermer receipt.'); }
-    finally { setPreparingThermer(''); }
-  };
-  const openThermer = (orderId: string) => {
-    if (!thermerLink || thermerLink.orderId !== orderId || thermerLink.expiresAt <= Date.now()) { setThermerLink(null); setError('The print link expired. Prepare a new Thermer link.'); return; }
-    const href = thermerLink.href;
-    setThermerLink(null); setNotice('Opening Thermer. Check the app and printer output; this page cannot confirm that printing succeeded.');
-    // Synchronous second tap preserves iOS user activation; never launch after an awaited fetch.
-    window.location.assign(href);
-  };
-
   return <SafeAreaView style={styles.root}><View style={styles.header}><View><Text style={styles.kicker}>NOVA · PRIVATE PREVIEW</Text><Text style={styles.title}>Shop admin</Text></View><Pressable onPress={onSignOut} style={styles.signOut}><Text style={styles.signOutText}>Sign out</Text></Pressable></View>
-    <View style={styles.tabs}><Pressable onPress={() => setSection('orders')} style={[styles.tab, section === 'orders' && styles.tabOn]}><Text style={[styles.tabText, section === 'orders' && styles.tabTextOn]}>Orders</Text></Pressable><Pressable onPress={() => setSection('stock')} style={[styles.tab, section === 'stock' && styles.tabOn]}><Text style={[styles.tabText, section === 'stock' && styles.tabTextOn]}>Stock / ml</Text></Pressable><Pressable onPress={() => setSection('discount')} style={[styles.tab, section === 'discount' && styles.tabOn]}><Text style={[styles.tabText, section === 'discount' && styles.tabTextOn]}>Discount</Text></Pressable><Pressable onPress={() => setSection('showcase')} style={[styles.tab, section === 'showcase' && styles.tabOn]}><Text style={[styles.tabText, section === 'showcase' && styles.tabTextOn]}>Live Board</Text></Pressable></View>
-    {section === 'orders' ? <View style={styles.toolbar}><Text style={styles.help}>Browser print width</Text>{([80, 110] as const).map(value => <Pressable key={value} onPress={() => setWidth(value)} style={[styles.widthButton, width === value && styles.widthOn]}><Text style={[styles.widthText, width === value && styles.widthTextOn]}>{value} mm</Text></Pressable>)}</View> : null}
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ maxHeight: 58, flexGrow: 0 }}><View style={styles.tabs}><Pressable onPress={() => setSection('orders')} style={[styles.tab, section === 'orders' && styles.tabOn]}><Text style={[styles.tabText, section === 'orders' && styles.tabTextOn]}>Orders</Text></Pressable><Pressable onPress={() => setSection('stock')} style={[styles.tab, section === 'stock' && styles.tabOn]}><Text style={[styles.tabText, section === 'stock' && styles.tabTextOn]}>Stock / ml</Text></Pressable><Pressable onPress={() => setSection('discount')} style={[styles.tab, section === 'discount' && styles.tabOn]}><Text style={[styles.tabText, section === 'discount' && styles.tabTextOn]}>Discount</Text></Pressable><Pressable onPress={() => setSection('media')} style={[styles.tab, section === 'media' && styles.tabOn]}><Text style={[styles.tabText, section === 'media' && styles.tabTextOn]}>Photos / Slides</Text></Pressable><Pressable onPress={() => setSection('showcase')} style={[styles.tab, section === 'showcase' && styles.tabOn]}><Text style={[styles.tabText, section === 'showcase' && styles.tabTextOn]}>Live Board</Text></Pressable></View></ScrollView>
+    {section === 'orders' ? <View style={styles.toolbar}><Text style={styles.help}>Paper size · 80 × 110 mm</Text></View> : null}
     {loading ? <Text style={styles.message}>Loading Preview data…</Text> : <ScrollView contentContainerStyle={styles.content}>
       {error ? <Text accessibilityRole="alert" style={styles.error}>{error}</Text> : null}{notice ? <Text accessibilityLiveRegion="polite" style={styles.notice}>{notice}</Text> : null}
       {section === 'showcase' ? <View style={{ gap: 12, backgroundColor: '#FFFFFF', borderRadius: 14, padding: 16 }}>
@@ -174,16 +138,16 @@ export default function AdminConsole({ onSignOut, authClient }: { onSignOut: () 
         <View style={{ flexDirection: 'row', gap: 10 }}><PrintButton title={showcaseEnabled ? '✓ Published' : 'Publish board'} onPress={() => setShowcaseEnabled(true)} /><PrintButton title={!showcaseEnabled ? '✓ Hidden' : 'Hide board'} onPress={() => setShowcaseEnabled(false)} /></View>
         <PrintButton title={working === 'showcase' ? 'Saving...' : 'Save Live Board'} disabled={working === 'showcase'} onPress={saveShowcase} />
       </View> : null}
-      {section === 'orders' ? <>
+      {section === 'media' ? <AdminMedia api={api} /> : section === 'orders' ? <>
         <View style={styles.sectionHeading}><Text style={styles.sectionTitle}>Order queue</Text><Pressable onPress={refresh}><Text style={styles.refresh}>Refresh</Text></Pressable></View>
-        <Text style={styles.helpBlock}>Thermer 80mm prepares a short-lived receipt link, then Open Thermer launches the iPhone app. Receipt and Address label keep the browser print fallback.</Text>
+        <Text style={styles.helpBlock}>Print slip / PDF / PNG ကိုနှိပ်ပြီး slip ကြည့်နိုင်၊ ဖိုင်သိမ်းနိုင်ပါတယ်။ iPhone မှာ Share → Thermer ဖြင့် Bluetooth printer ဆီ ပို့ပါ။</Text>
         {orders.length === 0 ? <Text style={styles.empty}>No Preview orders yet. Use fake details only while testing.</Text> : orders.map(order => <View key={order.id} style={styles.card}>
           <View style={styles.cardTop}><Text testID={`order-${order.id}`} style={styles.orderNumber}>{order.order_number}</Text><Text style={[styles.status, order.status === 'cancelled' && styles.cancelStatus]}>{statusLabel[order.status] || order.status}</Text></View>
           <Text style={styles.customer}>{order.customer_name} · {order.phone}</Text><Text style={styles.detail}>{order.address}</Text>
           {(order.nova_order_items || []).map((item, index) => <Text key={`${order.id}-${index}`} style={styles.item}>{item.product_name} ({item.product_id}) · {item.size} × {item.quantity} · {money(item.unit_price)} each</Text>)}
-          <Text style={styles.totalLine}>Subtotal: {money(order.subtotal)}</Text>{order.discount_percent > 0 ? <Text style={styles.discountLine}>Discount ({order.discount_percent}%): −{money(order.discount_amount)}</Text> : null}<Text style={styles.totalLine}>COD merchandise total: {money(order.total)}</Text><Text style={styles.timestamp}>Delivery fee not included; confirm separately.</Text>
+          <Text style={styles.totalLine}>Subtotal: {money(order.subtotal)}</Text>{order.discount_percent > 0 ? <Text style={styles.discountLine}>Discount ({order.discount_percent}%): −{money(order.discount_amount)}</Text> : null}<Text style={styles.totalLine}>COD merchandise total: {money(order.total)}</Text>
           <Text style={styles.timestamp}>{new Date(order.created_at).toLocaleString()}</Text>
-          <View style={styles.actionRow}>{nextStatus[order.status] ? <PrintButton title={nextStatus[order.status] === 'confirmed' ? 'Confirm' : nextStatus[order.status] === 'packing' ? 'Packing' : 'Delivery'} onPress={() => updateStatus(order, nextStatus[order.status] as string)} /> : null}{!['delivery', 'cancelled'].includes(order.status) ? <PrintButton title="Cancel" onPress={() => updateStatus(order, 'cancelled')} /> : null}<PrintButton title="Receipt" onPress={() => print(order, 'receipt')} /><PrintButton title="Address label" onPress={() => print(order, 'label')} /><PrintButton title="BLE Receipt (Android)" onPress={() => printBluetooth(order, 'receipt')} /><PrintButton title="BLE Label (Android)" onPress={() => printBluetooth(order, 'label')} /><PrintButton title={preparingThermer === order.id ? 'Preparing…' : 'Thermer 80mm'} disabled={Boolean(preparingThermer)} onPress={() => prepareThermer(order)} />{thermerLink?.orderId === order.id ? <PrintButton title="Open Thermer" onPress={() => openThermer(order.id)} /> : null}</View>
+          <View style={styles.actionRow}>{nextStatus[order.status] ? <PrintButton title={nextStatus[order.status] === 'confirmed' ? 'Confirm' : nextStatus[order.status] === 'packing' ? 'Packing' : 'Delivery'} onPress={() => updateStatus(order, nextStatus[order.status] as string)} /> : null}{!['delivery', 'cancelled'].includes(order.status) ? <PrintButton title="Cancel" onPress={() => updateStatus(order, 'cancelled')} /> : null}<PrintButton title="Print slip / PDF / PNG" onPress={() => setSlipOrder(order)} /><PrintButton title="Browser Print" onPress={() => print(order, 'receipt')} /><PrintButton title="Address label" onPress={() => print(order, 'label')} /></View>
           {(order.nova_order_status_history || []).length ? <Text style={styles.timestamp}>History: {(order.nova_order_status_history || []).map(event => statusLabel[event.to_status] || event.to_status).join(' → ')}</Text> : null}
         </View>)}
       </> : section === 'stock' ? <>
@@ -200,6 +164,7 @@ export default function AdminConsole({ onSignOut, authClient }: { onSignOut: () 
         <View style={styles.discountCard}><Text style={styles.discountStatus}>Current saved setting: {discountSetting.enabled ? `${discountSetting.percent}% enabled` : `disabled (${discountSetting.percent}% saved)`}</Text><Pressable accessibilityRole="switch" accessibilityState={{ checked: discountEnabled }} onPress={() => setDiscountEnabled(value => !value)} style={[styles.toggle, discountEnabled && styles.toggleOn]}><Text style={styles.toggleText}>{discountEnabled ? 'Discount ON · tap to turn off' : 'Discount OFF · tap to enable'}</Text></Pressable><View style={styles.discountInputRow}><Text style={styles.help}>Discount percent</Text><TextInput value={discountPercent} onChangeText={setDiscountPercent} keyboardType="decimal-pad" maxLength={6} accessibilityLabel="Discount percent" style={styles.discountInput}/><Text style={styles.help}>%</Text></View><Text style={styles.timestamp}>At this rate: 10ml would be {money(Math.round(shopPricing.sizes['10ml'] * (1 - Number(discountPercent || 0) / 100)))}; 30ml would be {money(Math.round(shopPricing.sizes['30ml'] * (1 - Number(discountPercent || 0) / 100)))}. Final totals are calculated and saved by the server when an order is received.</Text><Pressable disabled={working === 'discount'} onPress={saveDiscount} style={styles.saveButton}><Text style={styles.saveButtonText}>{working === 'discount' ? 'Saving…' : 'Save discount setting'}</Text></Pressable><Text style={styles.timestamp}>Initial default is disabled at 0%. Turn it off any time; saved orders are not repriced.</Text></View>
       </>}
     </ScrollView>}
+    {slipOrder ? <OrderSlip order={slipOrder} close={() => setSlipOrder(null)} /> : null}
   </SafeAreaView>;
 }
 
