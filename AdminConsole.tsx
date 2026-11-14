@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Platform, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { novaCatalog } from './data/nova-catalog';
 import { buildAddressLabelHtml, buildReceiptHtml } from './lib/print-templates.mjs';
@@ -6,6 +6,9 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import AdminMedia from './AdminMedia';
 import OrderSlip from './OrderSlip';
 import shopPricing from './data/shop-pricing.json';
+
+type Section = 'orders' | 'stock' | 'discount' | 'showcase' | 'media';
+const sections: { id: Section; label: string }[] = [{ id: 'orders', label: 'Orders' }, { id: 'stock', label: 'Stock / ml' }, { id: 'discount', label: 'Discount' }, { id: 'media', label: 'Photos / Slides' }, { id: 'showcase', label: 'Live Board' }];
 
 const API_URL = (process.env.EXPO_PUBLIC_API_URL || '').replace(/\/$/, '');
 const endpoint = (path: string) => {
@@ -35,7 +38,11 @@ export default function AdminConsole({ onSignOut, authClient }: { onSignOut: () 
   const [discountSetting, setDiscountSetting] = useState<DiscountSetting>({ enabled: false, percent: 0 });
   const [discountEnabled, setDiscountEnabled] = useState(false);
   const [discountPercent, setDiscountPercent] = useState('0');
-  const [section, setSection] = useState<'orders' | 'stock' | 'discount' | 'showcase' | 'media'>('orders');
+  const [section, setSection] = useState<Section>('orders');
+  const sectionHistory = useRef<Section[]>([]);
+  const contentScroll = useRef<ScrollView>(null);
+  const [mediaEditing, setMediaEditing] = useState(false);
+  const [mediaBusy, setMediaBusy] = useState(false);
   const [showcaseTitle, setShowcaseTitle] = useState('');
   const [showcaseDescription, setShowcaseDescription] = useState('');
   const [showcaseImage, setShowcaseImage] = useState('');
@@ -77,6 +84,23 @@ export default function AdminConsole({ onSignOut, authClient }: { onSignOut: () 
     finally { setLoading(false); }
   }, [api]);
   useEffect(() => { refresh(); }, [refresh]);
+
+  const canLeave = () => {
+    if (working || mediaBusy) { setNotice('သိမ်းဆည်းနေပါတယ်။ ခဏစောင့်ပြီး ပြန်နှိပ်ပါ။'); return false; }
+    return !mediaEditing || Platform.OS !== 'web' || window.confirm('မသိမ်းရသေးတဲ့ ပုံပြင်ဆင်မှုတွေကို ပယ်ဖျက်ပြီး ထွက်မလား။');
+  };
+  const navigate = (next: Section, back = false) => {
+    if (next === section || !canLeave()) return;
+    if (back) sectionHistory.current.pop(); else sectionHistory.current.push(section);
+    setSection(next); setError(''); setNotice('');
+    contentScroll.current?.scrollTo({ y: 0, animated: false });
+  };
+  useEffect(() => {
+    if (Platform.OS !== 'web' || !mediaEditing) return;
+    const warn = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = ''; };
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  }, [mediaEditing]);
 
   const inventoryByProduct = useMemo(() => new Map(inventory.map(item => [item.product_id, item])), [inventory]);
   const products = useMemo(() => novaCatalog.map(product => ({ id: product.id, name: product.name, family: product.familyLabel })), []);
@@ -123,10 +147,14 @@ export default function AdminConsole({ onSignOut, authClient }: { onSignOut: () 
     const html = kind === 'receipt' ? buildReceiptHtml(order, width) : buildAddressLabelHtml(order, width);
     popup.document.open(); popup.document.write(html); popup.document.close();
   };
-  return <SafeAreaView style={styles.root}><View style={styles.header}><View><Text style={styles.kicker}>NOVA · PRIVATE PREVIEW</Text><Text style={styles.title}>Shop admin</Text></View><Pressable onPress={onSignOut} style={styles.signOut}><Text style={styles.signOutText}>Sign out</Text></Pressable></View>
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ maxHeight: 58, flexGrow: 0 }}><View style={styles.tabs}><Pressable onPress={() => setSection('orders')} style={[styles.tab, section === 'orders' && styles.tabOn]}><Text style={[styles.tabText, section === 'orders' && styles.tabTextOn]}>Orders</Text></Pressable><Pressable onPress={() => setSection('stock')} style={[styles.tab, section === 'stock' && styles.tabOn]}><Text style={[styles.tabText, section === 'stock' && styles.tabTextOn]}>Stock / ml</Text></Pressable><Pressable onPress={() => setSection('discount')} style={[styles.tab, section === 'discount' && styles.tabOn]}><Text style={[styles.tabText, section === 'discount' && styles.tabTextOn]}>Discount</Text></Pressable><Pressable onPress={() => setSection('media')} style={[styles.tab, section === 'media' && styles.tabOn]}><Text style={[styles.tabText, section === 'media' && styles.tabTextOn]}>Photos / Slides</Text></Pressable><Pressable onPress={() => setSection('showcase')} style={[styles.tab, section === 'showcase' && styles.tabOn]}><Text style={[styles.tabText, section === 'showcase' && styles.tabTextOn]}>Live Board</Text></Pressable></View></ScrollView>
+  return <SafeAreaView style={styles.root}><View style={styles.header}><View><Text style={styles.kicker}>NOVA · PRIVATE PREVIEW</Text><Text style={styles.title}>Shop admin</Text></View><Pressable accessibilityRole="button" onPress={() => { if (canLeave()) onSignOut(); }} style={styles.signOut}><Text style={styles.signOutText}>Sign out</Text></Pressable></View>
+    <View style={styles.navigationActions}>
+      <Pressable accessibilityRole="button" disabled={Boolean(working) || mediaBusy} onPress={() => navigate(sectionHistory.current[sectionHistory.current.length - 1] || 'orders', true)} style={styles.navButton}><Text style={styles.signOutText}>← နောက်သို့</Text></Pressable>
+      <Pressable accessibilityRole="button" disabled={Boolean(working) || mediaBusy} onPress={() => { if (canLeave() && Platform.OS === 'web') window.location.assign('/'); }} style={styles.navButton}><Text style={styles.signOutText}>⌂ ဆိုင်သို့ ပြန်မယ်</Text></Pressable>
+    </View>
+    <View style={styles.tabs}>{sections.map(item => <Pressable key={item.id} accessibilityRole="button" accessibilityState={{ selected: section === item.id }} onPress={() => navigate(item.id)} style={[styles.tab, section === item.id && styles.tabOn]}><Text style={[styles.tabText, section === item.id && styles.tabTextOn]}>{item.label}</Text></Pressable>)}</View>
     {section === 'orders' ? <View style={styles.toolbar}><Text style={styles.help}>Paper size · 80 × 110 mm</Text></View> : null}
-    {loading ? <Text style={styles.message}>Loading Preview data…</Text> : <ScrollView contentContainerStyle={styles.content}>
+    {loading ? <Text style={styles.message}>Loading Preview data…</Text> : <ScrollView ref={contentScroll} contentContainerStyle={styles.content}>
       {error ? <Text accessibilityRole="alert" style={styles.error}>{error}</Text> : null}{notice ? <Text accessibilityLiveRegion="polite" style={styles.notice}>{notice}</Text> : null}
       {section === 'showcase' ? <View style={{ gap: 12, backgroundColor: '#FFFFFF', borderRadius: 14, padding: 16 }}>
         <Text style={styles.sectionTitle}>Home Live Display Board</Text>
@@ -138,7 +166,7 @@ export default function AdminConsole({ onSignOut, authClient }: { onSignOut: () 
         <View style={{ flexDirection: 'row', gap: 10 }}><PrintButton title={showcaseEnabled ? '✓ Published' : 'Publish board'} onPress={() => setShowcaseEnabled(true)} /><PrintButton title={!showcaseEnabled ? '✓ Hidden' : 'Hide board'} onPress={() => setShowcaseEnabled(false)} /></View>
         <PrintButton title={working === 'showcase' ? 'Saving...' : 'Save Live Board'} disabled={working === 'showcase'} onPress={saveShowcase} />
       </View> : null}
-      {section === 'media' ? <AdminMedia api={api} /> : section === 'orders' ? <>
+      {section === 'media' ? <AdminMedia api={api} onEditingChange={setMediaEditing} onBusyChange={setMediaBusy} /> : section === 'orders' ? <>
         <View style={styles.sectionHeading}><Text style={styles.sectionTitle}>Order queue</Text><Pressable onPress={refresh}><Text style={styles.refresh}>Refresh</Text></Pressable></View>
         <Text style={styles.helpBlock}>Print slip / PDF / PNG ကိုနှိပ်ပြီး slip ကြည့်နိုင်၊ ဖိုင်သိမ်းနိုင်ပါတယ်။ iPhone မှာ Share → Thermer ဖြင့် Bluetooth printer ဆီ ပို့ပါ။</Text>
         {orders.length === 0 ? <Text style={styles.empty}>No Preview orders yet. Use fake details only while testing.</Text> : orders.map(order => <View key={order.id} style={styles.card}>
@@ -173,7 +201,8 @@ const styles = StyleSheet.create({
   header: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   kicker: { color: '#946D25', fontSize: 9, letterSpacing: 1.4, fontWeight: '700' }, title: { color: '#102B62', fontSize: 26, fontWeight: '700', marginTop: 4 },
   signOut: { borderWidth: 1, borderColor: '#D6C7AE', borderRadius: 10, paddingVertical: 8, paddingHorizontal: 12 }, signOutText: { color: '#102B62', fontSize: 12, fontWeight: '700' },
-  tabs: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: '#E6DDD3', paddingHorizontal: 20 }, tab: { paddingVertical: 12, paddingHorizontal: 16, borderBottomWidth: 2, borderBottomColor: 'transparent' }, tabOn: { borderBottomColor: '#946D25' }, tabText: { color: '#7D766D', fontSize: 13 }, tabTextOn: { color: '#102B62', fontWeight: '700' },
+  navigationActions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingHorizontal: 20, paddingBottom: 10 }, navButton: { minHeight: 44, justifyContent: 'center', borderWidth: 1, borderColor: '#D6C7AE', borderRadius: 10, paddingHorizontal: 12 },
+  tabs: { flexDirection: 'row', flexWrap: 'wrap', borderBottomWidth: 1, borderBottomColor: '#E6DDD3', paddingHorizontal: 20 }, tab: { minHeight: 44, justifyContent: 'center', paddingVertical: 12, paddingHorizontal: 16, borderBottomWidth: 2, borderBottomColor: 'transparent' }, tabOn: { borderBottomColor: '#946D25' }, tabText: { color: '#7D766D', fontSize: 13 }, tabTextOn: { color: '#102B62', fontWeight: '700' },
   toolbar: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 20, paddingVertical: 10 }, help: { color: '#746B60', fontSize: 11, marginRight: 3 }, widthButton: { borderWidth: 1, borderColor: '#D7CDBE', borderRadius: 9, paddingVertical: 6, paddingHorizontal: 10 }, widthOn: { backgroundColor: '#102B62', borderColor: '#102B62' }, widthText: { color: '#5C544B', fontSize: 11 }, widthTextOn: { color: '#FFFDF9', fontWeight: '700' },
   content: { paddingHorizontal: 16, paddingTop: 10, paddingBottom: 44 }, message: { color: '#6E665D', padding: 20 }, sectionHeading: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }, sectionTitle: { color: '#102B62', fontSize: 19, fontWeight: '700', marginBottom: 10 }, refresh: { color: '#946D25', fontSize: 12, fontWeight: '700' },
   card: { backgroundColor: '#FFFDF9', borderColor: '#E8DED1', borderWidth: 1, borderRadius: 15, padding: 14, marginBottom: 12 }, stockCard: { backgroundColor: '#FFFDF9', borderColor: '#E8DED1', borderWidth: 1, borderRadius: 15, padding: 13, marginTop: 8 }, cardTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }, orderNumber: { color: '#102B62', fontSize: 14, fontWeight: '800', flexShrink: 1 }, status: { color: '#946D25', fontSize: 11, fontWeight: '700', textAlign: 'right' }, cancelStatus: { color: '#A35F4B' }, customer: { color: '#332F2A', fontSize: 13, fontWeight: '700', marginTop: 9 }, detail: { color: '#5D5750', fontSize: 12, lineHeight: 18, marginTop: 4 }, item: { color: '#102B62', fontSize: 12, lineHeight: 18, marginTop: 8 }, timestamp: { color: '#93897E', fontSize: 10, marginTop: 7 },

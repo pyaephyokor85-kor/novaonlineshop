@@ -26,7 +26,7 @@ export default function OrderSlip({ order, close }: { order: any; close: () => v
     return action(() => direct ? printBleRaster(current.canvas) : shareSlip(current), direct ? 'Printer ဆီ data ပို့ပြီးပါပြီ။ စာရွက်ထွက်မထွက် စစ်ပေးပါ။' : 'Thermer ထဲမှာ printer နဲ့ စာရွက်အရွယ်ရွေးပြီး Print နှိပ်ပါ။');
   };
   return <Modal visible animationType="slide" onRequestClose={() => { if(!busy) close(); }}><View style={{ flex:1,backgroundColor:'#FBF7EF',paddingTop:18 }}>
-    <View style={{ padding:14,flexDirection:'row',justifyContent:'space-between',alignItems:'center' }}><Text style={{ fontSize:22,fontWeight:'700',color:'#102B62' }}>NOVA Order Slip</Text><Pressable disabled={busy} onPress={close} style={{ padding:12 }}><Text>Close ✕</Text></Pressable></View>
+    <View style={{ padding:14,flexDirection:'row',justifyContent:'space-between',alignItems:'center' }}><Text style={{ fontSize:22,fontWeight:'700',color:'#102B62' }}>NOVA Delivery Slip</Text><Pressable disabled={busy} onPress={close} style={{ padding:12 }}><Text>Close ✕</Text></Pressable></View>
     <Text style={{ paddingHorizontal:16,fontWeight:'700',color:'#102B62' }}>Paper: 80 × 110 mm</Text>
     {slip?.pages?.length > 1 ? <View style={{ flexDirection:'row',flexWrap:'wrap',padding:12 }}>{slip.pages.map((_: any,index: number) => <Pressable key={index} disabled={busy} onPress={() => setPage(index)} style={{ padding:12,backgroundColor:page===index?'#E8C977':'#EEE8DF',margin:4 }}><Text>စာမျက်နှာ {index+1}</Text></Pressable>)}</View> : null}
     <Text style={{ padding:12,color:'#746B60' }}>iPhone: Print → Share ထဲက Thermer ကိုရွေးပါ။ စာရွက်အရွယ် 80 × 110 mm ရွေးပါ။ စာမျက်နှာများရင် Print / PNG ကို တစ်ရွက်ချင်းရွေးပါ။</Text>
