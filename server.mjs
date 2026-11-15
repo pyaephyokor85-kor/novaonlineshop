@@ -1,3 +1,5 @@
+import publicMediaHandler from './api/storefront-media.mjs';
+import showcaseHandler from './api/showcase.mjs';
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -33,7 +35,7 @@ function readBody(req) {
     req.on('data', chunk => {
       if (settled) return;
       size += chunk.length;
-      if (size > 100_000) {
+      if (size > (req.url === '/api/admin/media' ? 3_000_000 : 100_000)) {
         chunks = [];
         const error = new Error('Payload too large'); error.statusCode = 413;
         fail(error); req.resume(); return;
@@ -91,6 +93,10 @@ const server = http.createServer(async (req, res) => {
       return printJson(res, result.status, result.body);
     } catch (error) { return printJson(res, error.statusCode || 400, { error: error.message || 'Preview print request failed.' }); }
   }
+  if (req.method === 'GET' && ['/api/storefront-media', '/api/showcase'].includes(req.url)) {
+    const response = { setHeader: (k,v) => res.setHeader(k,v), status: code => ({ json: body => json(res, code, body) }) };
+    return (req.url === '/api/storefront-media' ? publicMediaHandler : showcaseHandler)(req, response);
+  }
   if (req.method === 'OPTIONS') return json(res, 204, {});
   if (req.method === 'GET' && req.url === '/health') return json(res, 200, { ok: true, provider, model, memory: 'file-backed', supabase: Boolean(supabaseUrl && supabaseKey), catalogSize: catalogProducts.length });
   if (req.url === '/api/cloud-profile' && req.method === 'GET') { try { const result = await readCloudProfile(req); return json(res, result.error ? result.status : 200, result.error ? { error: result.error } : { profile: result.profile, user: { id: result.user.id, email: result.user.email } }); } catch (e) { return json(res, 502, { error: e.message }); } }
@@ -101,7 +107,7 @@ const server = http.createServer(async (req, res) => {
   if (req.url === '/api/cloud-purchases' && req.method === 'GET') { try { const auth = await authenticatedSupabaseUser(req); if (auth.error) return json(res, auth.status, { error: auth.error }); const r = await fetch(`${supabaseUrl}/rest/v1/fragrance_purchases?select=product_id,purchased_at,quantity,price&order=purchased_at.desc`, { headers: { apikey: supabaseKey, Authorization: `Bearer ${auth.token}` } }); const data = await r.json().catch(() => ({})); return json(res, r.ok ? 200 : r.status, r.ok ? { purchases: data } : { error: data.message || 'Supabase purchase history read failed' }); } catch (e) { return json(res, 502, { error: e.message }); } }
   if (req.url === '/api/cloud-purchases' && req.method === 'POST') { try { const auth = await authenticatedSupabaseUser(req); if (auth.error) return json(res, auth.status, { error: auth.error }); const body = await readBody(req); const purchase = body.purchase || {}; if (!catalogProducts.some(x => x.id === String(purchase.productId || purchase.product_id))) return json(res, 400, { error: 'Unknown NOVA product' }); const row = { user_id: auth.user.id, product_id: String(purchase.productId || purchase.product_id), purchased_at: purchase.purchasedAt || purchase.purchased_at || new Date().toISOString(), quantity: Math.max(1, Number(purchase.quantity || 1)), price: purchase.price || null }; const r = await fetch(`${supabaseUrl}/rest/v1/fragrance_purchases`, { method: 'POST', headers: { apikey: supabaseKey, Authorization: `Bearer ${auth.token}`, 'Content-Type': 'application/json', Prefer: 'return=representation' }, body: JSON.stringify(row) }); const data = await r.json().catch(() => ({})); return json(res, r.ok ? 201 : r.status, r.ok ? { purchase: data[0] || row } : { error: data.message || 'Supabase purchase history write failed' }); } catch (e) { return json(res, 502, { error: e.message }); } }
   if (req.url === '/api/current-discount') { const result = await processPublicDiscountRequest({ method: req.method }); return json(res, result.status, result.body); }
-  const adminMatch = req.url?.match(/^\/api\/admin\/(orders|inventory|discount)$/);
+  const adminMatch = req.url?.match(/^\/api\/admin\/(orders|inventory|discount|showcase|media|session)$/);
   if (adminMatch) {
     try {
       const body = req.method === 'POST' ? await readBody(req) : undefined;
