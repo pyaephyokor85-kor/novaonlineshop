@@ -9,7 +9,7 @@ const fakeOrder = { id: '00000000-0000-4000-8000-000000000001', order_number: 'N
 const jsonResponse = data => ({ ok: true, json: async () => data });
 const listOrders = orders => processAdminRequest({ method: 'GET', headers: { authorization: 'Bearer fake-staff-token' } }, { resource: 'orders', env, fetchImpl: async url => jsonResponse(url.endsWith('/auth/v1/user') ? { id: 'fake-staff', email: 'staff@example.test' } : orders) });
 
-test('orders API normalizes the one-to-one item object for queue rendering and 80/110mm printing', async () => {
+test('orders API normalizes the one-to-one item object for queue rendering and fixed 80×110mm printing', async () => {
   // nova_order_items.order_id is UNIQUE, so PostgREST embeds a single object.
   const source = { ...fakeOrder, nova_order_items: item };
   const result = await listOrders([source]);
@@ -21,9 +21,8 @@ test('orders API normalizes the one-to-one item object for queue rendering and 8
   for (const width of [80, 110]) {
     const receipt = buildReceiptHtml(order, width);
     const label = buildAddressLabelHtml(order, width);
-    assert.match(receipt, new RegExp(`@page\\{size:${width}mm ${width}mm;margin:0\\}`));
-    assert.match(receipt, new RegExp(`pageSize\\.textContent = '@page\\{size:${width}mm '\\s*\\+ pageHeightMm`));
-    assert.match(label, new RegExp(`@page\\{size:${width}mm 100mm;margin:0\\}`));
+    assert.match(receipt, /@page\{size:80mm 110mm;margin:0\}/);
+    assert.match(label, /@page\{size:80mm 110mm;margin:0\}/);
     assert.doesNotMatch(receipt, /@page\{size:\d+mm auto;/);
     assert.match(receipt, /Fake Preview Scent/);
     assert.match(receipt, /10ml/);

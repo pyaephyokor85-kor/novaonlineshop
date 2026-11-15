@@ -35,8 +35,8 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "build:web": "expo export --platform web",
-    "vercel-build": "expo export --platform web",
+    "build:web": "node scripts/check-vercel-functions.mjs && expo export --platform web",
+    "vercel-build": "npm run build:web",
     "api": "node --env-file-if-exists=.env server.mjs",
     "test": "node --test tests/*.test.mjs",
     "typecheck": "tsc --noEmit"
