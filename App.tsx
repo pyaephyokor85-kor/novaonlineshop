@@ -220,7 +220,7 @@ function Home({ go, pick }: { go: (t: Tab) => void; pick: (p: Product) => void }
   const adviserChips = ['Fresh', 'For work', 'By mood'];
   return <ScrollView contentContainerStyle={s.homePage} showsVerticalScrollIndicator={false}>
     <View style={s.homeContent}>
-      <View style={s.brandRow}><Image source={require('./assets/nova-logo-authentic.png')} style={s.brandLogo} resizeMode="contain" accessibilityLabel="NOVA" /><View style={s.brandActions}>{Platform.OS === 'web' ? <Pressable accessibilityRole="button" accessibilityLabel="Staff login" onPress={() => { if (typeof window !== 'undefined') window.location.assign('/admin'); }} style={s.brandStaff}><Text style={s.brandStaffText}>Staff Login</Text></Pressable> : null}<Pressable accessibilityRole="button" accessibilityLabel="Open your NOVA account" onPress={() => go('profile')} style={s.brandAccount}><Text style={s.brandAccountText}>Account</Text></Pressable></View></View>
+      <View style={s.brandRow}><Image source={require('./assets/nova-logo-authentic.png')} style={s.brandLogo} resizeMode="contain" accessibilityLabel="NOVA" /><View style={s.brandActions}><Pressable accessibilityRole="button" accessibilityLabel="Open your NOVA account" onPress={() => go('profile')} style={s.brandAccount}><Text style={s.brandAccountText}>Account</Text></Pressable></View></View>
       <LiveShowcase go={go} />
       <View style={[s.hero, heroStack && s.heroStack]}><View style={[s.heroCopyBlock, heroStack && s.heroCopyStack]}><Text style={s.heroKicker}>NOVA FRAGRANCE</Text><Text style={s.heroTitle}>Your scent.{`\n`}Your story.</Text><Text style={s.heroCopy}>သင့်ရဲ့ စတိုင်နဲ့ လိုက်ဖက်မယ့် ရနံ့ကို ရှာဖွေလိုက်ပါ။</Text><Pressable accessibilityRole="button" accessibilityLabel="Explore NOVA scents" onPress={() => go('discover')} style={s.heroButton}><Text style={s.heroButtonText}>Explore scents  →</Text></Pressable></View><Image source={require('./assets/nova-perfume-set.png')} style={[s.heroImage, heroStack && s.heroImageStack]} resizeMode="contain" accessibilityLabel="NOVA perfume set" /></View>
       <View style={[s.adviserCard, adviserStack && s.adviserCardStack]}><Pressable accessibilityRole="button" accessibilityLabel="Chat with NOVA AI Agent" onPress={() => go('advisor')} style={[s.robotFrame, adviserStack && s.robotFrameStack]}><LivingNovaAgent size={adviserStack ? 145 : 92} /></Pressable><View style={[s.adviserWords, adviserStack && s.adviserWordsStack]}><Text style={s.adviserKicker}>A LITTLE HELP, FROM NOVA</Text><Text style={s.adviserTitle}>Meet NOVA AI Agent</Text><Text style={s.adviserCopy}>မေးလိုက်ပါ။ သင့်စိတ်ခံစားချက်နဲ့ အချိန်အခါအလိုက် ရနံ့ရွေးပေးမယ်။</Text><View style={s.adviserChips}>{adviserChips.map(chip => <Pressable key={chip} accessibilityRole="button" accessibilityLabel={`Ask NOVA about ${chip} scents`} onPress={() => go('advisor')} style={s.adviserChip}><Text style={s.adviserChipText}>{chip}</Text></Pressable>)}</View><Pressable accessibilityRole="button" accessibilityLabel="Ask NOVA AI Agent" onPress={() => go('advisor')} style={s.adviserCta}><Text style={s.adviserCtaText}>Ask NOVA  →</Text></Pressable></View></View>
@@ -246,7 +246,7 @@ function ProfileMemory({ profile }: { profile: FragranceProfile }) {
   return <View style={s.memoryCard}><View style={s.memoryTitleRow}><Text style={s.memoryTitle}>Your fragrance profile</Text><Text style={s.memorySpark}>✦</Text></View><Text style={s.memoryCopy}>{items.length ? 'NOVA is learning your scent signature.' : 'Chat with NOVA to start building your scent signature.'}</Text><View style={s.chipRow}>{items.map(item => <View style={s.chip} key={item}><Text style={s.chipText}>{item}</Text></View>)}</View>{profile.moods.length > 0 && <Text style={s.memoryMeta}>Mood: {profile.moods.slice(0, 2).join(' · ')}</Text>}</View>;
 }
 function RecommendationStrip({ items, pick }: { items: Recommendation[]; pick: (p: Product) => void }) {
-  return <View className="mt-1"><Text className="mb-2 text-[10px] font-bold tracking-[1.5px] text-nova-clay">CURATED FOR YOUR PROFILE</Text><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerClassName="gap-2 pb-1">{items.filter(item => !item.blocked).slice(0, 3).map(item => <View key={item.id} className="w-40 rounded-2xl border border-[#E8DED1] bg-[#FFFDF9] p-3"><Text className="text-[12px] font-bold text-nova-ink">{item.name}</Text><Text className="mt-1 text-[10px] text-nova-clay">{item.family.join(' · ')}</Text><Text className="mt-2 text-[10px] leading-4 text-nova-muted">{item.matchedNotes.length ? `Matches ${item.matchedNotes.join(', ')}` : 'A balanced NOVA signature'}</Text>{item.seasonalMatches.length ? <Text className="mt-1 text-[10px] leading-4 text-[#A8754B]">Seasonal: {item.seasonalMatches.slice(0, 2).join(', ')}</Text> : null}{item.purchaseMatches > 0 ? <Text className="mt-1 text-[10px] leading-4 text-[#6D8B6F]">Based on your purchase history</Text> : null}<Text className="mt-2 text-[11px] font-bold text-nova-ink">{shopPricing.priceLabel}</Text><Pressable accessibilityRole="button" accessibilityLabel={`Open order form for ${item.id} ${item.name}`} onPress={() => { const product = products.find(p => p.id === item.id); if (product) pick(product); }} style={{ minHeight: 44, justifyContent: 'center', marginTop: 8 }}><Text className="text-[11px] font-bold text-nova-ink">အော်ဒါဖောင်ဖွင့်မယ် →</Text></Pressable></View>)}</ScrollView></View>;
+  return <View className="mt-1"><Text className="mb-2 text-[12px] font-bold tracking-[1.5px] text-nova-clay">CURATED FOR YOUR PROFILE</Text><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerClassName="gap-2 pb-1">{items.filter(item => !item.blocked).slice(0, 3).map(item => <View key={item.id} className="w-40 rounded-2xl border border-[#E8DED1] bg-[#FFFDF9] p-3"><Text className="text-[12px] font-bold text-nova-ink">{item.name}</Text><Text className="mt-1 text-[12px] text-nova-clay">{item.family.join(' · ')}</Text><Text className="mt-2 text-[12px] leading-4 text-nova-muted">{item.matchedNotes.length ? `Matches ${item.matchedNotes.join(', ')}` : 'A balanced NOVA signature'}</Text>{item.seasonalMatches.length ? <Text className="mt-1 text-[12px] leading-4 text-[#A8754B]">Seasonal: {item.seasonalMatches.slice(0, 2).join(', ')}</Text> : null}{item.purchaseMatches > 0 ? <Text className="mt-1 text-[12px] leading-4 text-[#6D8B6F]">Based on your purchase history</Text> : null}<Text className="mt-2 text-[13px] font-bold text-nova-ink">{shopPricing.priceLabel}</Text><Pressable accessibilityRole="button" accessibilityLabel={`Open order form for ${item.id} ${item.name}`} onPress={() => { const product = products.find(p => p.id === item.id); if (product) pick(product); }} style={{ minHeight: 44, justifyContent: 'center', marginTop: 8 }}><Text className="text-[13px] font-bold text-nova-ink">အော်ဒါဖောင်ဖွင့်မယ် →</Text></Pressable></View>)}</ScrollView></View>;
 }
 // Validate only the response fields used by the client; never display raw error bodies.
 const isRecord = (value: unknown): value is Record<string, unknown> => Boolean(value && typeof value === 'object' && !Array.isArray(value));
@@ -366,7 +366,6 @@ function Profile({ onSignOut }: { onSignOut: () => void }) {
       </Pressable>
       {supportError ? <Text accessibilityRole="alert" style={s.profileSub}>{supportError}</Text> : null}
     </>}
-    {Platform.OS === 'web' ? <Pressable accessibilityRole="button" onPress={() => { if (typeof window !== 'undefined') window.location.assign('/admin'); }} style={s.menu}><Text style={s.menuText}>🔐  Staff Login</Text><Text style={s.chevron}>›</Text></Pressable> : null}
     <Pressable onPress={onSignOut} style={s.menu}><Text style={[s.menuText, { color: '#A35F4B' }]}>↪  Sign out</Text><Text style={s.chevron}>›</Text></Pressable></ScrollView>;
 }
 function AuthScreen({ onAuth }: { onAuth: (session: string) => void }) {
@@ -396,7 +395,7 @@ function AuthScreen({ onAuth }: { onAuth: (session: string) => void }) {
     try { const identity = await getProfileId(); await AsyncStorage.setItem('@nova/local-session', identity); onAuth(identity); }
     catch { setError('Unable to save your guest session. Please try again.'); }
   };
-  return <SafeAreaView className="flex-1 bg-nova-cream"><ScrollView contentContainerClassName="items-center px-7 pb-12 pt-14" showsVerticalScrollIndicator={false}><View className="h-16 w-16 items-center justify-center rounded-full bg-nova-ink shadow-lg"><Text className="text-3xl font-bold text-nova-gold">N</Text></View><Text className="mt-4 text-lg font-bold tracking-[6px] text-nova-ink">NOVA</Text><Text className="mt-2 text-center text-[13px] text-nova-clay">A more personal way to wear fragrance.</Text><View className="mt-9 w-full rounded-[24px] border border-[#EFE7DD] bg-nova-paper p-6 shadow-xl"><Text className="text-[25px] font-semibold text-nova-ink">{mode === 'login' ? 'Welcome back.' : 'Create your scent space.'}</Text><Text className="mt-2 text-xs leading-5 text-nova-muted">{mode === 'login' ? 'Continue your fragrance journey.' : 'Your preferences will shape every recommendation.'}</Text><TextInput value={email} onChangeText={setEmail} placeholder="Email address" placeholderTextColor="#A39A91" keyboardType="email-address" autoCapitalize="none" className="mt-5 rounded-xl bg-[#F3EEE7] px-4 py-3.5 text-[13px] text-nova-ink"/><TextInput value={password} onChangeText={setPassword} placeholder="Password" placeholderTextColor="#A39A91" secureTextEntry className="mt-2 rounded-xl bg-[#F3EEE7] px-4 py-3.5 text-[13px] text-nova-ink"/><Pressable onPress={submit} disabled={submitting} className="mt-4 items-center rounded-xl bg-nova-ink py-4 active:opacity-80"><Text className="text-[13px] font-bold text-[#F7EEE3]">{submitting ? 'Please wait…' : mode === 'login' ? 'Log in  →' : 'Create account  →'}</Text></Pressable><View className="mt-5 flex-row justify-center"><Text className="text-xs text-nova-muted">{mode === 'login' ? 'New to NOVA?' : 'Already have an account?'}</Text><Pressable onPress={() => setMode(mode === 'login' ? 'signup' : 'login')}><Text className="text-xs font-bold text-nova-clay">{mode === 'login' ? ' Create account' : ' Log in'}</Text></Pressable></View></View>{error ? <Text className="mt-4 text-center text-[11px] leading-4 text-[#A35F4B]">{error}</Text> : null}<Pressable onPress={continueGuest}><Text className="mt-6 text-[13px] font-bold text-nova-clay">Continue as guest for now</Text></Pressable><Text className="mt-3 text-center text-[10px] text-[#B3ABA2]">Guest preferences stay on this device. Signed-in profiles sync when configured.</Text></ScrollView></SafeAreaView>;
+  return <SafeAreaView className="flex-1 bg-nova-cream"><ScrollView contentContainerClassName="items-center px-7 pb-12 pt-14" showsVerticalScrollIndicator={false}><View className="h-16 w-16 items-center justify-center rounded-full bg-nova-ink shadow-lg"><Text className="text-3xl font-bold text-nova-gold">N</Text></View><Text className="mt-4 text-lg font-bold tracking-[6px] text-nova-ink">NOVA</Text><Text className="mt-2 text-center text-[15px] text-nova-clay">A more personal way to wear fragrance.</Text><View className="mt-9 w-full rounded-[24px] border border-[#EFE7DD] bg-nova-paper p-6 shadow-xl"><Text className="text-[25px] font-semibold text-nova-ink">{mode === 'login' ? 'Welcome back.' : 'Create your scent space.'}</Text><Text className="mt-2 text-sm leading-5 text-nova-muted">{mode === 'login' ? 'Continue your fragrance journey.' : 'Your preferences will shape every recommendation.'}</Text><TextInput value={email} onChangeText={setEmail} placeholder="Email address" placeholderTextColor="#A39A91" keyboardType="email-address" autoCapitalize="none" className="mt-5 rounded-xl bg-[#F3EEE7] px-4 py-3.5 text-[15px] text-nova-ink"/><TextInput value={password} onChangeText={setPassword} placeholder="Password" placeholderTextColor="#A39A91" secureTextEntry className="mt-2 rounded-xl bg-[#F3EEE7] px-4 py-3.5 text-[15px] text-nova-ink"/><Pressable onPress={submit} disabled={submitting} className="mt-4 items-center rounded-xl bg-nova-ink py-4 active:opacity-80"><Text className="text-[15px] font-bold text-[#F7EEE3]">{submitting ? 'Please wait…' : mode === 'login' ? 'Log in  →' : 'Create account  →'}</Text></Pressable><View className="mt-5 flex-row justify-center"><Text className="text-sm text-nova-muted">{mode === 'login' ? 'New to NOVA?' : 'Already have an account?'}</Text><Pressable onPress={() => setMode(mode === 'login' ? 'signup' : 'login')}><Text className="text-sm font-bold text-nova-clay">{mode === 'login' ? ' Create account' : ' Log in'}</Text></Pressable></View></View>{error ? <Text className="mt-4 text-center text-[13px] leading-4 text-[#A35F4B]">{error}</Text> : null}<Pressable onPress={continueGuest}><Text className="mt-6 text-[15px] font-bold text-nova-clay">Continue as guest for now</Text></Pressable><Text className="mt-3 text-center text-[12px] text-[#B3ABA2]">Guest preferences stay on this device. Signed-in profiles sync when configured.</Text></ScrollView></SafeAreaView>;
 }
 function Detail({ p, close }: { p: Product; close: () => void }) {
   const [name, setName] = useState(''); const [phone, setPhone] = useState('');
@@ -444,7 +443,7 @@ function Detail({ p, close }: { p: Product; close: () => void }) {
       setOrderStatus('ပို့မှုအခြေအနေကို အတည်မပြုနိုင်သေးပါ။ ထပ်မပို့ခင် ဆိုင်နှင့် စစ်ဆေးပေးပါ။');
     } finally { sendingRef.current = false; setSending(false); }
   };
-  const field = { backgroundColor: '#FFFDF9', borderWidth: 1, borderColor: '#E6DDD3', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, color: '#102B62', fontSize: 13, marginTop: 9 } as const;
+  const field = { backgroundColor: '#FFFDF9', borderWidth: 1, borderColor: '#E6DDD3', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, color: '#102B62', fontSize: 15, marginTop: 9 } as const;
   return <SafeAreaView style={s.detail}><ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 35 }}>
     <Pressable accessibilityRole="button" accessibilityLabel="Close order form" disabled={sending} onPress={close}><Text style={s.back}>‹ ပြန်သွားမယ် / ရေမွှေးပြောင်းရွေးမယ်</Text></Pressable>
     <View style={[s.detailVisual, { height: 180 }]}><Bottle p={p} /></View>
@@ -494,7 +493,7 @@ function StorefrontApp() {
     })();
     return () => { active = false; subscription?.unsubscribe(); };
   }, []);
- if (booting) return <SafeAreaView style={s.auth}><StatusBar style="dark" /></SafeAreaView>; const screen = tab === 'home' ? <Home go={setTab} pick={setSelected} /> : tab === 'discover' ? <Discover pick={setSelected} /> : tab === 'advisor' ? <Advisor pick={setSelected} /> : !session ? <AuthScreen onAuth={setSession} /> : <Profile onSignOut={async () => { if (supabase) await supabase.auth.signOut(); await AsyncStorage.removeItem('@nova/local-session'); setTab('home'); setSelected(null); setSession(null); }} />; return <SafeAreaView style={s.app}><StatusBar style="dark" />{screen}<View style={s.nav}>{([['home', '⌂', 'Home'], ['discover', '◒', 'Discover'], ['advisor', '✦', 'AI Agent'], ['profile', '○', 'Profile']] as const).map(([key, icon, label]) => <Pressable key={key} onPress={() => setTab(key)} style={s.navItem}>{key === 'advisor' ? <LivingNovaAgent size={32} compact /> : <Text style={[s.navIcon, tab === key && s.navActive]}>{icon}</Text>}<Text style={[s.navLabel, tab === key && s.navActive]}>{label}</Text></Pressable>)}</View><Modal visible={Boolean(selected)} animationType="slide" onRequestClose={() => {}}>{selected ? <Detail key={selected.id} p={selected} close={() => setSelected(null)} /> : null}</Modal></SafeAreaView>; }
+ if (booting) return <SafeAreaView style={s.auth}><StatusBar style="dark" /></SafeAreaView>; const screen = tab === 'home' ? <Home go={setTab} pick={setSelected} /> : tab === 'discover' ? <Discover pick={setSelected} /> : tab === 'advisor' ? <Advisor pick={setSelected} /> : !session ? <AuthScreen onAuth={setSession} /> : <Profile onSignOut={async () => { if (supabase) await supabase.auth.signOut(); await AsyncStorage.removeItem('@nova/local-session'); setTab('home'); setSelected(null); setSession(null); }} />; return <SafeAreaView style={s.app}><StatusBar style="dark" />{screen}<View style={s.nav}>{([['home', '⌂', 'Home'], ['discover', '◒', 'Discover'], ['advisor', '✦', 'AI Agent'], ['profile', '○', 'Profile']] as const).map(([key, icon, label]) => <Pressable key={key} onPress={() => setTab(key)} style={s.navItem}>{key === 'advisor' ? <LivingNovaAgent size={32} compact /> : <Text style={[s.navIcon, tab === key && s.navActive]}>{icon}</Text>}<Text style={[s.navLabel, tab === key && s.navActive]}>{label}</Text></Pressable>)}{tab === 'home' && Platform.OS === 'web' ? <Pressable accessibilityRole="button" accessibilityLabel="Admin and staff login" onPress={() => window.location.assign('/admin')} style={s.navItem}><Text style={s.navIcon}>🔐</Text><Text style={s.navLabel}>Admin / Staff</Text></Pressable> : null}</View><Modal visible={Boolean(selected)} animationType="slide" onRequestClose={() => {}}>{selected ? <Detail key={selected.id} p={selected} close={() => setSelected(null)} /> : null}</Modal></SafeAreaView>; }
 
 export default function App() {
   const isAdminRoute = Platform.OS === 'web' && typeof window !== 'undefined' && window.location.pathname.replace(/\/+$/, '') === '/admin';
@@ -503,48 +502,46 @@ export default function App() {
 
 const s = StyleSheet.create({
 showcaseCard: { backgroundColor: '#102B62', borderRadius: 20, padding: 16, marginBottom: 14, overflow: 'hidden' },
-showcaseKicker: { color: '#E8C977', fontSize: 9, letterSpacing: 1.2, fontWeight: '800' },
+showcaseKicker: { color: '#E8C977', fontSize: 11, letterSpacing: 1.2, fontWeight: '800' },
 showcaseMain: { minHeight: 190, flexDirection: 'row', alignItems: 'center' },
 showcaseWords: { flex: 1, paddingRight: 6 },
 showcaseTitle: { color: '#FFF9ED', fontSize: 21, lineHeight: 26, fontWeight: '700' },
-showcaseCopy: { color: '#E3E7EF', fontSize: 11, lineHeight: 18, marginTop: 8 },
+showcaseCopy: { color: '#E3E7EF', fontSize: 13, lineHeight: 22, marginTop: 8 },
 showcaseImage: { width: '44%', height: 178 },
 showcaseButton: { marginTop: 12, backgroundColor: '#E8C977', borderRadius: 10, paddingVertical: 11, paddingHorizontal: 10, alignSelf: 'flex-start' },
-showcaseButtonText: { color: '#102B62', fontSize: 10, fontWeight: '800' },
+showcaseButtonText: { color: '#102B62', fontSize: 12, fontWeight: '800' },
 showcaseDots: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, paddingTop: 4, paddingBottom: 2 },
 showcaseDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#7586A7' },
 showcaseDotActive: { width: 19, backgroundColor: '#E8C977' },
 homePage: { paddingBottom: 24 },
 notice: { backgroundColor: '#102B62', paddingHorizontal: 16, paddingVertical: 8, minHeight: 34, flexDirection: 'row', alignItems: 'center', gap: 8 },
-noticeLabel: { color: '#E8C977', fontSize: 8, letterSpacing: 1.2, fontWeight: '800', flexShrink: 1 },
-noticeCopy: { color: '#FFF9ED', fontSize: 10, lineHeight: 16, flex: 1 },
+noticeLabel: { color: '#E8C977', fontSize: 10, letterSpacing: 1.2, fontWeight: '800', flexShrink: 1 },
+noticeCopy: { color: '#FFF9ED', fontSize: 12, lineHeight: 20, flex: 1 },
 homeContent: { paddingHorizontal: 18 },
 brandRow: { backgroundColor: '#102B62', borderRadius: 16, alignItems: 'center', justifyContent: 'center', paddingTop: 18, paddingBottom: 12, marginBottom: 16, gap: 10 },
 brandLogo: { width: 160, height: 82 },
 brandActions: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-brandStaff: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 8 },
-brandStaffText: { color: '#E8C977', fontSize: 10, fontWeight: '700' },
 brandAccount: { minWidth: 44, minHeight: 44, paddingHorizontal: 8, alignItems: 'center', justifyContent: 'center' },
-brandAccountText: { color: '#FFF9ED', fontSize: 11, fontWeight: '700' },
+brandAccountText: { color: '#FFF9ED', fontSize: 13, fontWeight: '700' },
 hero: { minHeight: 224, backgroundColor: '#102B62', borderRadius: 20, padding: 18, overflow: 'hidden', flexDirection: 'row', alignItems: 'center', marginBottom: 14 },
 heroCopyBlock: { flex: 1, zIndex: 1 },
-heroKicker: { color: '#E8C977', fontSize: 8, letterSpacing: 1.4, fontWeight: '800' },
+heroKicker: { color: '#E8C977', fontSize: 10, letterSpacing: 1.4, fontWeight: '800' },
 heroTitle: { color: '#FFF9ED', fontSize: 28, lineHeight: 31, fontWeight: '600', marginTop: 9, letterSpacing: -.4 },
-heroCopy: { color: '#E3E7EF', fontSize: 11, lineHeight: 18, marginTop: 10, maxWidth: 190 },
+heroCopy: { color: '#E3E7EF', fontSize: 13, lineHeight: 22, marginTop: 10, maxWidth: 190 },
 heroImage: { width: '42%', maxWidth: 148, height: 168, marginRight: -12, marginLeft: -5 },
 heroStack: { minHeight: 0, flexDirection: 'column', alignItems: 'stretch' },
 heroCopyStack: { width: '100%' },
 heroImageStack: { width: '100%', maxWidth: 230, height: 150, alignSelf: 'center', marginTop: 4, marginRight: 0, marginLeft: 0 },
 heroButton: { minHeight: 44, alignSelf: 'flex-start', justifyContent: 'center', paddingHorizontal: 14, borderRadius: 10, backgroundColor: '#E8C977', marginTop: 13 },
-heroButtonText: { color: '#102B62', fontSize: 11, fontWeight: '800' },
+heroButtonText: { color: '#102B62', fontSize: 13, fontWeight: '800' },
 adviserCard: { backgroundColor: '#F2E9DA', borderRadius: 18, padding: 15, minHeight: 174, flexDirection: 'row', alignItems: 'center', overflow: 'hidden', marginBottom: 26, borderWidth: 1, borderColor: '#E4D6C2' },
 adviserWords: { flex: 1, paddingLeft: 10 },
-adviserKicker: { color: '#946D25', fontSize: 8, letterSpacing: 1.1, fontWeight: '800' },
+adviserKicker: { color: '#946D25', fontSize: 10, letterSpacing: 1.1, fontWeight: '800' },
 adviserTitle: { color: '#102B62', fontSize: 19, lineHeight: 24, fontWeight: '700', marginTop: 6 },
-adviserCopy: { color: '#665D55', fontSize: 11, lineHeight: 17, marginTop: 6 },
+adviserCopy: { color: '#665D55', fontSize: 13, lineHeight: 21, marginTop: 6 },
 adviserChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 5, marginTop: 10 },
 adviserChip: { minHeight: 34, paddingHorizontal: 10, borderRadius: 17, justifyContent: 'center', backgroundColor: '#FFFDF9', borderWidth: 1, borderColor: '#D9C7AC' },
-adviserChipText: { color: '#5D4C3E', fontSize: 10, fontWeight: '700' },
+adviserChipText: { color: '#5D4C3E', fontSize: 12, fontWeight: '700' },
 robotFrame: { width: 92, height: 122, borderRadius: 16, backgroundColor: '#FFFFFF', overflow: 'hidden', justifyContent: 'center', alignItems: 'center' },
 agentEyelid: { position: 'absolute', backgroundColor: '#244A8B', borderRadius: 99, alignItems: 'center', justifyContent: 'center' },
 agentClosedEye: { width: '74%', height: 1.5, backgroundColor: '#D9B96C', borderRadius: 3 },
@@ -555,22 +552,22 @@ adviserCardStack: { flexDirection: 'column', alignItems: 'stretch' },
 adviserWordsStack: { width: '100%', paddingRight: 0 },
 robotFrameStack: { width: '100%', height: 150, marginBottom: 12 },
 adviserCta: { minHeight: 44, alignSelf: 'flex-start', justifyContent: 'center', marginTop: 8, paddingHorizontal: 2 },
-adviserCtaText: { color: '#102B62', fontSize: 12, fontWeight: '800' },
+adviserCtaText: { color: '#102B62', fontSize: 14, fontWeight: '800' },
 sectionHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 12 },
 sectionTitle: { color: '#102B62', fontSize: 19, fontWeight: '700' },
-sectionSub: { color: '#9B968E', fontSize: 11, marginTop: 4 },
+sectionSub: { color: '#9B968E', fontSize: 13, marginTop: 4 },
 seeAllButton: { minHeight: 44, justifyContent: 'center', paddingLeft: 8 },
-seeAll: { color: '#946D25', fontWeight: '800', fontSize: 11 },
+seeAll: { color: '#946D25', fontWeight: '800', fontSize: 13 },
 rowList: { gap: 12, paddingBottom: 10 },
 card: { width: 188, backgroundColor: '#FFFDF9', borderRadius: 16, overflow: 'hidden', marginRight: 0 },
 productImage: { height: 158, backgroundColor: '#F0E9DE', justifyContent: 'center', alignItems: 'center', position: 'relative' },
-cardTag: { position: 'absolute', top: 10, left: 10, fontSize: 8, color: '#946D25', fontWeight: '800', letterSpacing: .5 },
+cardTag: { position: 'absolute', top: 10, left: 10, fontSize: 10, color: '#946D25', fontWeight: '800', letterSpacing: .5 },
 heart: { position: 'absolute', right: 10, top: 7, color: '#716A62', fontSize: 21 },
 cardBody: { padding: 12 },
-productName: { color: '#102B62', fontSize: 13, fontWeight: '700', flexShrink: 1, minWidth: 0 },
-price: { color: '#946D25', fontWeight: '700', fontSize: 11, flexShrink: 1, width: '100%' },
-family: { color: '#8D867D', fontSize: 10, marginTop: 4 },
-notes: { color: '#B1AAA1', fontSize: 9, marginTop: 6 },
+productName: { color: '#102B62', fontSize: 15, fontWeight: '700', flexShrink: 1, minWidth: 0 },
+price: { color: '#946D25', fontWeight: '700', fontSize: 13, flexShrink: 1, width: '100%' },
+family: { color: '#8D867D', fontSize: 12, marginTop: 4 },
+notes: { color: '#B1AAA1', fontSize: 11, marginTop: 6 },
 bottleWrapSmall: { height: 120 },
 productPhotoSmall: { width: 125, height: 116, borderRadius: 10 },
 capSmall: { width: 26, height: 23 },
@@ -579,7 +576,7 @@ bottleMarkSmall: { fontSize: 20 },
 app: { flex: 1, width: '100%', maxWidth: 760, alignSelf: 'center', backgroundColor: '#FBF7EF' },
 page: { padding: 24, paddingBottom: 110 },
 top: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 26 },
-eyebrow: { fontSize: 10, letterSpacing: 2, color: '#946D25', fontWeight: '700' },
+eyebrow: { fontSize: 12, letterSpacing: 2, color: '#946D25', fontWeight: '700' },
 heading: { color: '#102B62', fontSize: 25, fontWeight: '500', marginTop: 6, letterSpacing: -1 },
 avatar: { width: 42, height: 42, borderRadius: 21, backgroundColor: '#102B62', justifyContent: 'center', alignItems: 'center' },
 avatarText: { color: '#E7C99D', fontSize: 18, fontWeight: '700' },
@@ -596,22 +593,22 @@ bottleMark: { color: '#6D4C3A', fontSize: 28, fontWeight: '300', fontFamily: 'se
 bottleWord: { color: '#6D4C3A', fontSize: 7, letterSpacing: 2, marginTop: 4 },
 editCard: { backgroundColor: '#F0E7D4', borderRadius: 20, padding: 20, minHeight: 170, flexDirection: 'row', overflow: 'hidden' },
 editTitle: { color: '#382B24', fontSize: 20, fontWeight: '600', marginTop: 8 },
-editCopy: { color: '#7D6B5D', fontSize: 12, lineHeight: 18, marginTop: 8, maxWidth: 215 },
-link: { color: '#93623D', fontSize: 12, fontWeight: '700', marginTop: 15 },
+editCopy: { color: '#7D6B5D', fontSize: 14, lineHeight: 22, marginTop: 8, maxWidth: 215 },
+link: { color: '#93623D', fontSize: 14, fontWeight: '700', marginTop: 15 },
 orb: { width: 85, height: 85, borderRadius: 43, backgroundColor: '#BE936D', alignItems: 'center', justifyContent: 'center', marginTop: 28, marginRight: -20 },
 orbText: { color: '#FAE9CE', fontSize: 34 },
-intro: { color: '#766F67', lineHeight: 20, fontSize: 14, marginBottom: 20 },
+intro: { color: '#766F67', lineHeight: 24, fontSize: 16, marginBottom: 20 },
 search: { fontSize: 28, color: '#7E756D' },
 filters: { gap: 8, paddingBottom: 25 },
 filter: { paddingVertical: 9, paddingHorizontal: 17, borderRadius: 18, borderWidth: 1, borderColor: '#E2DCD2' },
 filterOn: { backgroundColor: '#102B62', borderColor: '#102B62' },
-filterText: { color: '#9B948B', fontSize: 12 },
+filterText: { color: '#9B948B', fontSize: 14 },
 filterTextOn: { color: '#F7EEE3', fontWeight: '700' },
 grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', gap: 12 },
 gridSingle: { justifyContent: 'flex-start' },
 advisor: { flex: 1, backgroundColor: '#FBF7EF' },
 advisorHead: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 20, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-online: { color: '#6D8B6F', fontSize: 10, letterSpacing: 1, fontWeight: '700' },
+online: { color: '#6D8B6F', fontSize: 12, letterSpacing: 1, fontWeight: '700' },
 chat: { padding: 18, paddingTop: 10, gap: 13, paddingBottom: 30 },
 agentMessageRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 8, alignSelf: 'flex-start', maxWidth: '100%' },
 customerMessageRow: { alignSelf: 'flex-end', maxWidth: '88%' },
@@ -619,69 +616,69 @@ agentAvatar: { width: 42, height: 48, borderRadius: 12, backgroundColor: '#F2E9D
 agentSpeechBubble: { flexShrink: 1, maxWidth: '82%' },
 bubble: { backgroundColor: '#F2EBDD', padding: 15, borderRadius: 18, borderBottomLeftRadius: 4, maxWidth: '88%' },
 userBubble: { backgroundColor: '#102B62', alignSelf: 'flex-end', borderBottomLeftRadius: 18, borderBottomRightRadius: 4 },
-bubbleText: { color: '#263D67', fontSize: 14, lineHeight: 21 },
+bubbleText: { color: '#263D67', fontSize: 16, lineHeight: 25 },
 userText: { color: '#F7EEE3' },
 composer: { flexDirection: 'row', padding: 14, borderTopWidth: 1, borderTopColor: '#E6E0D7', backgroundColor: '#FFFCF7', alignItems: 'center' },
-input: { flex: 1, paddingHorizontal: 15, paddingVertical: 12, color: '#102B62', backgroundColor: '#F3EEE7', borderRadius: 24, fontSize: 13 },
+input: { flex: 1, paddingHorizontal: 15, paddingVertical: 12, color: '#102B62', backgroundColor: '#F3EEE7', borderRadius: 24, fontSize: 15 },
 send: { width: 43, height: 43, borderRadius: 22, marginLeft: 8, backgroundColor: '#946D25', alignItems: 'center', justifyContent: 'center' },
 sendText: { color: 'white', fontSize: 22 },
 memoryCard: { backgroundColor: '#F0E7D4', borderRadius: 18, padding: 16, marginBottom: 14 },
 memoryTitleRow: { flexDirection: 'row', justifyContent: 'space-between' },
-memoryTitle: { color: '#102B62', fontSize: 15, fontWeight: '700' },
+memoryTitle: { color: '#102B62', fontSize: 17, fontWeight: '700' },
 memorySpark: { color: '#946D25', fontSize: 18 },
-memoryCopy: { color: '#796B60', fontSize: 12, lineHeight: 18, marginTop: 6 },
+memoryCopy: { color: '#796B60', fontSize: 14, lineHeight: 22, marginTop: 6 },
 chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 10 },
 chip: { backgroundColor: '#F8F1E8', borderRadius: 12, paddingHorizontal: 9, paddingVertical: 5 },
-chipText: { color: '#8E6445', fontSize: 10, fontWeight: '600' },
-memoryMeta: { color: '#967457', fontSize: 11, marginTop: 9 },
+chipText: { color: '#8E6445', fontSize: 12, fontWeight: '600' },
+memoryMeta: { color: '#967457', fontSize: 15, marginTop: 9 },
 profileMemory: { backgroundColor: '#102B62', borderRadius: 20, padding: 20, marginBottom: 20 },
-profileMemoryKicker: { color: '#D8B768', fontSize: 10, letterSpacing: 1.5, fontWeight: '700' },
+profileMemoryKicker: { color: '#D8B768', fontSize: 12, letterSpacing: 1.5, fontWeight: '700' },
 profileMemoryTitle: { color: '#FFF9F1', fontSize: 22, fontWeight: '500', marginTop: 10 },
-profileMemoryCopy: { color: '#C5BDB4', fontSize: 12, lineHeight: 18, marginTop: 8 },
+profileMemoryCopy: { color: '#C5BDB4', fontSize: 14, lineHeight: 22, marginTop: 8 },
 profileRow: { backgroundColor: '#FFFDF9', borderBottomWidth: 1, borderBottomColor: '#F0ECE6', padding: 15 },
-profileRowLabel: { color: '#8E867E', fontSize: 11 },
-profileRowValue: { color: '#3F3831', fontSize: 13, marginTop: 5 },
+profileRowLabel: { color: '#8E867E', fontSize: 13 },
+profileRowValue: { color: '#3F3831', fontSize: 15, marginTop: 5 },
 auth: { flex: 1, backgroundColor: '#FBF7EF' },
 authContent: { padding: 28, alignItems: 'center', paddingTop: 56 },
 authLogo: { width: 64, height: 64, borderRadius: 32, backgroundColor: '#102B62', alignItems: 'center', justifyContent: 'center' },
 authLogoText: { color: '#E7C99D', fontSize: 28, fontWeight: '700' },
 authBrand: { color: '#102B62', fontSize: 19, letterSpacing: 6, fontWeight: '700', marginTop: 15 },
-authTagline: { color: '#946D25', fontSize: 13, marginTop: 8, textAlign: 'center' },
+authTagline: { color: '#946D25', fontSize: 15, marginTop: 8, textAlign: 'center' },
 authPanel: { alignSelf: 'stretch', backgroundColor: '#FFFDF9', borderRadius: 22, padding: 22, marginTop: 38 },
 authTitle: { color: '#102B62', fontSize: 24, fontWeight: '600' },
-authSub: { color: '#958C83', fontSize: 12, lineHeight: 18, marginTop: 7, marginBottom: 20 },
-authInput: { backgroundColor: '#F3EEE7', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 13, color: '#102B62', fontSize: 13, marginBottom: 10 },
+authSub: { color: '#958C83', fontSize: 14, lineHeight: 22, marginTop: 7, marginBottom: 20 },
+authInput: { backgroundColor: '#F3EEE7', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 13, color: '#102B62', fontSize: 15, marginBottom: 10 },
 authButton: { backgroundColor: '#102B62', borderRadius: 12, paddingVertical: 15, alignItems: 'center', marginTop: 4 },
-authButtonText: { color: '#F7EEE3', fontSize: 13, fontWeight: '700' },
+authButtonText: { color: '#F7EEE3', fontSize: 15, fontWeight: '700' },
 authSwitch: { flexDirection: 'row', justifyContent: 'center', marginTop: 18 },
-authSwitchText: { color: '#958C83', fontSize: 12 },
-authLink: { color: '#946D25', fontSize: 12, fontWeight: '700' },
-guestLink: { color: '#946D25', fontSize: 13, fontWeight: '700', marginTop: 25 },
-authError: { color: '#A35F4B', fontSize: 11, lineHeight: 16, textAlign: 'center', marginTop: 16 },
-localNote: { color: '#B3ABA2', fontSize: 10, marginTop: 14, textAlign: 'center' },
+authSwitchText: { color: '#958C83', fontSize: 14 },
+authLink: { color: '#946D25', fontSize: 14, fontWeight: '700' },
+guestLink: { color: '#946D25', fontSize: 15, fontWeight: '700', marginTop: 25 },
+authError: { color: '#A35F4B', fontSize: 13, lineHeight: 20, textAlign: 'center', marginTop: 16 },
+localNote: { color: '#B3ABA2', fontSize: 12, marginTop: 14, textAlign: 'center' },
 profileTop: { alignItems: 'center', paddingVertical: 35 },
 largeAvatar: { width: 84, height: 84, borderRadius: 42, backgroundColor: '#102B62', alignItems: 'center', justifyContent: 'center', marginBottom: 18 },
 largeAvatarText: { color: '#E7C99D', fontSize: 34, fontWeight: '700' },
 profileName: { fontSize: 20, color: '#102B62', fontWeight: '600' },
 profileSub: { color: '#9C958C', marginTop: 7 },
 menu: { backgroundColor: '#FFFDF9', padding: 19, borderBottomWidth: 1, borderBottomColor: '#F0ECE6', flexDirection: 'row', justifyContent: 'space-between' },
-menuText: { color: '#4D4640', fontSize: 14 },
+menuText: { color: '#4D4640', fontSize: 16 },
 chevron: { color: '#B4ACA2', fontSize: 22 },
 nav: { flexShrink: 0, minHeight: 76, backgroundColor: '#FFFCF7', borderTopWidth: 1, borderTopColor: '#EEE8DF', flexDirection: 'row', justifyContent: 'space-around', paddingTop: 11, paddingBottom: 8 },
-navItem: { alignItems: 'center', justifyContent: 'center', minWidth: 64, minHeight: 52, flex: 1, paddingHorizontal: 3 },
-navIcon: { color: '#B5ADA3', fontSize: 22, height: 28 },
-navLabel: { color: '#A7A097', fontSize: 10, marginTop: 3, textAlign: 'center', flexShrink: 1 },
+navItem: { alignItems: 'center', justifyContent: 'center', minWidth: 0, minHeight: 52, flex: 1, paddingHorizontal: 3 },
+navIcon: { color: '#6E7785', fontSize: 22, height: 28 },
+navLabel: { color: '#5D6575', fontSize: 12, marginTop: 3, textAlign: 'center', flexShrink: 1 },
 navActive: { color: '#946D25', fontWeight: '700' },
 pressed: { opacity: .78 },
 detail: { flex: 1, padding: 24, backgroundColor: '#FBF7EF' },
-back: { color: '#8F694A', fontSize: 14, marginBottom: 15 },
+back: { color: '#8F694A', fontSize: 16, marginBottom: 15 },
 detailVisual: { height: 340, backgroundColor: '#EDE3D5', borderRadius: 26, alignItems: 'center', justifyContent: 'center', marginBottom: 25 },
 detailTitle: { fontSize: 32, color: '#102B62', fontWeight: '500', marginTop: 8 },
-detailNotes: { color: '#946D25', fontSize: 14, marginTop: 8 },
-detailDescription: { color: '#7F776E', fontSize: 14, lineHeight: 22, marginTop: 23, maxWidth: 320 },
-detailMeta: { color: '#946D25', fontSize: 11, lineHeight: 17, marginTop: 12, maxWidth: 320 },
+detailNotes: { color: '#946D25', fontSize: 16, marginTop: 8 },
+detailDescription: { color: '#7F776E', fontSize: 16, lineHeight: 26, marginTop: 23, maxWidth: 320 },
+detailMeta: { color: '#946D25', fontSize: 13, lineHeight: 21, marginTop: 12, maxWidth: 320 },
 detailBottom: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 35 },
 detailPrice: { color: '#102B62', fontSize: 24, fontWeight: '600' },
 add: { backgroundColor: '#102B62', borderRadius: 24, paddingVertical: 14, paddingHorizontal: 21 },
-addText: { color: '#F7EEE3', fontWeight: '700', fontSize: 12 }
+addText: { color: '#F7EEE3', fontWeight: '700', fontSize: 14 }
 });
