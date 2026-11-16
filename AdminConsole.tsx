@@ -4,11 +4,12 @@ import { novaCatalog } from './data/nova-catalog';
 import { buildAddressLabelHtml, buildReceiptHtml } from './lib/print-templates.mjs';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import AdminMedia from './AdminMedia';
+import AdminStock from './AdminStock';
 import OrderSlip from './OrderSlip';
 import shopPricing from './data/shop-pricing.json';
 
-type Section = 'orders' | 'stock' | 'discount' | 'showcase' | 'media';
-const sections: { id: Section; label: string }[] = [{ id: 'orders', label: 'Orders' }, { id: 'stock', label: 'Stock / ml' }, { id: 'discount', label: 'Discount' }, { id: 'media', label: 'Photos / Slides' }, { id: 'showcase', label: 'Live Board' }];
+type Section = 'orders' | 'stock' | 'legacyStock' | 'daily' | 'discount' | 'showcase' | 'media';
+const sections: { id: Section; label: string }[] = [{ id: 'orders', label: 'Orders' }, { id: 'stock', label: 'Stock In / Out' }, { id: 'daily', label: 'နေ့စဉ်စာရင်း' }, { id: 'legacyStock', label: 'အဟောင်း / အရည် ml' }, { id: 'discount', label: 'Discount' }, { id: 'media', label: 'Photos / Slides' }, { id: 'showcase', label: 'Live Board' }];
 
 const API_URL = (process.env.EXPO_PUBLIC_API_URL || '').replace(/\/$/, '');
 const endpoint = (path: string) => {
@@ -43,6 +44,7 @@ export default function AdminConsole({ onSignOut, authClient }: { onSignOut: () 
   const contentScroll = useRef<ScrollView>(null);
   const [mediaEditing, setMediaEditing] = useState(false);
   const [mediaBusy, setMediaBusy] = useState(false);
+  const [stockBusy, setStockBusy] = useState(false);
   const [showcaseTitle, setShowcaseTitle] = useState('');
   const [showcaseDescription, setShowcaseDescription] = useState('');
   const [showcaseImage, setShowcaseImage] = useState('');
@@ -86,7 +88,7 @@ export default function AdminConsole({ onSignOut, authClient }: { onSignOut: () 
   useEffect(() => { refresh(); }, [refresh]);
 
   const canLeave = () => {
-    if (working || mediaBusy) { setNotice('သိမ်းဆည်းနေပါတယ်။ ခဏစောင့်ပြီး ပြန်နှိပ်ပါ။'); return false; }
+    if (working || mediaBusy || stockBusy) { setNotice('သိမ်းဆည်းနေပါတယ်။ ခဏစောင့်ပြီး ပြန်နှိပ်ပါ။'); return false; }
     return !mediaEditing || Platform.OS !== 'web' || window.confirm('မသိမ်းရသေးတဲ့ ပုံပြင်ဆင်မှုတွေကို ပယ်ဖျက်ပြီး ထွက်မလား။');
   };
   const navigate = (next: Section, back = false) => {
@@ -168,6 +170,7 @@ export default function AdminConsole({ onSignOut, authClient }: { onSignOut: () 
       </View> : null}
       {section === 'media' ? <AdminMedia api={api} onEditingChange={setMediaEditing} onBusyChange={setMediaBusy} /> : section === 'orders' ? <>
         <View style={styles.sectionHeading}><Text style={styles.sectionTitle}>Order queue</Text><Pressable onPress={refresh}><Text style={styles.refresh}>Refresh</Text></Pressable></View>
+        <PrintButton title="နေ့စဉ်စာရင်းပိတ်ကြည့်ရန်" onPress={() => navigate('daily')} />
         <Text style={styles.helpBlock}>Print slip / PDF / PNG ကိုနှိပ်ပြီး slip ကြည့်နိုင်၊ ဖိုင်သိမ်းနိုင်ပါတယ်။ iPhone မှာ Share → Thermer ဖြင့် Bluetooth printer ဆီ ပို့ပါ။</Text>
         {orders.length === 0 ? <Text style={styles.empty}>No Preview orders yet. Use fake details only while testing.</Text> : orders.map(order => <View key={order.id} style={styles.card}>
           <View style={styles.cardTop}><Text testID={`order-${order.id}`} style={styles.orderNumber}>{order.order_number}</Text><Text style={[styles.status, order.status === 'cancelled' && styles.cancelStatus]}>{statusLabel[order.status] || order.status}</Text></View>
@@ -178,8 +181,8 @@ export default function AdminConsole({ onSignOut, authClient }: { onSignOut: () 
           <View style={styles.actionRow}>{nextStatus[order.status] ? <PrintButton title={nextStatus[order.status] === 'confirmed' ? 'Confirm' : nextStatus[order.status] === 'packing' ? 'Packing' : 'Delivery'} onPress={() => updateStatus(order, nextStatus[order.status] as string)} /> : null}{!['delivery', 'cancelled'].includes(order.status) ? <PrintButton title="Cancel" onPress={() => updateStatus(order, 'cancelled')} /> : null}<PrintButton title="Print slip / PDF / PNG" onPress={() => setSlipOrder(order)} /><PrintButton title="Browser Print" onPress={() => print(order, 'receipt')} /><PrintButton title="Address label" onPress={() => print(order, 'label')} /></View>
           {(order.nova_order_status_history || []).length ? <Text style={styles.timestamp}>History: {(order.nova_order_status_history || []).map(event => statusLabel[event.to_status] || event.to_status).join(' → ')}</Text> : null}
         </View>)}
-      </> : section === 'stock' ? <>
-        <Text style={styles.sectionTitle}>Manual stock and ml</Text><Text style={styles.helpBlock}>Balances are separate and are not changed automatically when an order is placed. Every +/− adjustment needs a reason and is recorded.</Text>
+      </> : section === 'stock' || section === 'daily' ? <AdminStock key={section} api={api} mode={section} onBusyChange={setStockBusy} /> : section === 'legacyStock' ? <>
+        <Text style={styles.sectionTitle}>အဟောင်း Units / အရည် ml</Text><Text style={styles.helpBlock}>ဒီစာရင်းအဟောင်းကို 10ml/30ml ပုလင်းစာရင်းနဲ့ မပေါင်းထားပါ။ ပုလင်းအဝင်/အထွက်အတွက် Stock In / Out ကိုသုံးပါ။ ဒီနေရာမှာ အရည် ml စာရင်းကို သီးခြားထိန်းနိုင်ပါတယ်။</Text>
         <Text style={styles.historyHeading}>Recent adjustment history</Text>{adjustments.length ? adjustments.slice(0, 12).map(entry => <View key={`${entry.product_id}-${entry.created_at}`} style={styles.historyRow}><Text style={styles.historyText}>{entry.product_id} · {entry.delta > 0 ? '+' : ''}{entry.delta} {entry.metric === 'ml' ? 'ml' : 'units'} · {entry.previous_value == null ? 'new' : entry.previous_value} → {entry.new_value}</Text><Text style={styles.timestamp}>{entry.reason} · {entry.actor_email} · {new Date(entry.created_at).toLocaleString()}</Text></View>) : <Text style={styles.timestamp}>No adjustments recorded yet.</Text>}
         {products.map(product => { const row = inventoryByProduct.get(product.id); const selectedMetric = metric[product.id] || 'units'; const current = selectedMetric === 'ml' ? row?.stock_ml : row?.stock_units; return <View key={product.id} style={styles.stockCard}>
           <View style={styles.cardTop}><Text style={styles.orderNumber}>{product.id}</Text><Text style={styles.stockValue}>{current == null ? 'Not set' : `${current} ${selectedMetric === 'ml' ? 'ml' : 'units'}`}</Text></View><Text style={styles.customer}>{product.name}</Text>
