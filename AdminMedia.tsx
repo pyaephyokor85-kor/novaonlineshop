@@ -68,11 +68,13 @@ export default function AdminMedia({ api, onEditingChange, onBusyChange }: { api
       {button('+ Slide အသစ်', () => select(blank(`slide-${Date.now()}`)))}
       {rows.filter(r => r.kind === 'slide' && !r.deleted).map(row => <View key={row.id} style={field}>{row.image_url ? <Image source={{ uri: row.image_url }} style={{ width: '100%', height: 130 }} resizeMode="contain" /> : null}<Text>{row.title} · {row.enabled ? 'Published' : 'Hidden'} · #{row.sort_order}</Text>{button('Edit / Delete', () => select(row))}</View>)}
       <Text style={{ fontSize: 18, marginTop: 20, color: '#102B62' }}>Product Photos · NV-001–NV-032</Text>
+      <Text style={{ fontSize: 15, lineHeight: 25, marginTop: 8, color: '#5D6575' }}>NV Profile ပုံ: JPG / PNG / WebP · 2 MB အထိ။ အကြံပြုဆိုဒ် 1080 × 1080 px (1:1)။ Pixel size သီးသန့်ကန့်သတ်ချက် မရှိပါ။ ပုလင်းနဲ့ စာသားကို အလယ်ပိုင်းမှာထားပြီး အနားပတ်လည် နေရာချန်ပါ။</Text>
       {novaCatalog.map(product => { const row = rows.find(r => r.id === product.id); return <View key={product.id} style={field}><Text>{product.id} — {product.name}</Text><Text>{row?.deleted ? 'ပုံဖျက်ထားသည်' : row?.image_url ? 'သိမ်းထားသောပုံ' : 'မူလပုံ'}</Text>{button('ပုံတင် / ပြင် / ဖျက်', () => select(row || blank(product.id)))}</View>; })}
     </> : <View style={field}>
       {button('← ပုံစာရင်းသို့ ပြန်မယ်', backToList)}
       <Text style={{ fontWeight: '700' }}>{draft.id} · {draft.kind === 'product' ? novaCatalog.find(p => p.id === draft.id)?.name : 'Slide'}</Text>
       {draft.image_url ? <Image source={{ uri: draft.image_url }} style={{ width: '100%', height: 190 }} resizeMode="contain" /> : <Text style={{ marginTop: 12 }}>ပုံရွေးပေးပါ။</Text>}
+      <Text style={{ fontSize: 15, lineHeight: 25, marginTop: 8, color: '#5D6575' }}>{draft.kind === 'product' ? 'Product profile: 1080 × 1080 px (1:1) အကြံပြု · JPG / PNG / WebP · 2 MB အထိ' : 'Slide: JPG / PNG / WebP · 2 MB အထိ'}</Text>
       {button(busy ? 'ခဏစောင့်ပါ…' : 'Upload / Replace photo', upload)}
       {draft.kind === 'slide' ? <>
         <TextInput accessibilityLabel="Slide title" placeholder="Slide ခေါင်းစဉ်" maxLength={90} value={draft.title} editable={!busy} onChangeText={title => setDraft({ ...draft, title })} style={field}/>
