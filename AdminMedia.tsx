@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Image, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { novaCatalog } from './data/nova-catalog';
 import type { MediaRow } from './StorefrontMedia';
+import { prepareProfileImage } from './lib/profile-image.mjs';
 type Api = (path: string, method?: string, body?: any) => Promise<any>;
 const blank = (id: string): MediaRow => ({ id, kind: id.startsWith('NV-') ? 'product' : 'slide', title: '', description: '', image_url: null, enabled: true, deleted: false, cta: 'discover', sort_order: 0 });
 const field = { borderWidth: 1, borderColor: '#D7CDBE', borderRadius: 10, padding: 12, marginTop: 10, color: '#102B62', backgroundColor: '#FFFDF9' } as const;
@@ -33,7 +34,9 @@ export default function AdminMedia({ api, onEditingChange, onBusyChange }: { api
     input.onchange = async () => {
       const file = input.files?.[0]; if (!file) return;
       setError(''); setNotice('');
-      if (file.size > 2 * 1024 * 1024) { setError(`ပုံအရွယ်အစား ${(file.size / 1024 / 1024).toFixed(2)} MB ဖြစ်နေပါတယ်။ 2 MB အောက်ပုံ ရွေးပေးပါ။`); return; }
+      const isProfile = id.startsWith('NV-');
+      const inputLimit = (isProfile ? 20 : 2) * 1024 * 1024;
+      if (file.size > inputLimit) { setError(isProfile ? '20 MB အောက်ပုံ ရွေးပေးပါ။ Profile ပုံကို upload မတင်မီ အလိုအလျောက် ချုံ့ပေးပါမယ်။' : 'Slide ပုံကို 2 MB အောက် ရွေးပေးပါ။'); return; }
       setBusy(true);
       try {
         // iPhone Files can return an empty or generic MIME type for valid images.
@@ -44,7 +47,8 @@ export default function AdminMedia({ api, onEditingChange, onBusyChange }: { api
           : bytes[0] === 255 && bytes[1] === 216 && bytes[2] === 255 ? 'image/jpeg'
           : bytes[0] === 82 && bytes[1] === 73 && bytes[2] === 70 && bytes[3] === 70 && bytes[8] === 87 && bytes[9] === 69 && bytes[10] === 66 && bytes[11] === 80 ? 'image/webp' : '';
         if (!mime) throw new Error('ဒီဖိုင်က PNG / JPEG / WebP ပုံ မဟုတ်ပါ။ HEIC ပုံဆိုရင် JPEG အဖြစ် ပြောင်းပြီး ရွေးပေးပါ။');
-        const imageFile = new Blob([bytes], { type: mime });
+        let imageFile: Blob = new Blob([bytes], { type: mime });
+        if (isProfile) imageFile = (await prepareProfileImage(imageFile)).blob;
         const dataUrl = await new Promise<string>((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(String(reader.result)); reader.onerror = () => reject(new Error('ဖိုင်ဖတ်မရပါ။')); reader.readAsDataURL(imageFile); });
         const data = await api('/api/admin/media', 'POST', { action: 'upload', id, dataUrl });
         setDraft(old => old?.id === id ? { ...old, image_url: data.image_url, deleted: false } : old);
@@ -68,13 +72,13 @@ export default function AdminMedia({ api, onEditingChange, onBusyChange }: { api
       {button('+ Slide အသစ်', () => select(blank(`slide-${Date.now()}`)))}
       {rows.filter(r => r.kind === 'slide' && !r.deleted).map(row => <View key={row.id} style={field}>{row.image_url ? <Image source={{ uri: row.image_url }} style={{ width: '100%', height: 130 }} resizeMode="contain" /> : null}<Text>{row.title} · {row.enabled ? 'Published' : 'Hidden'} · #{row.sort_order}</Text>{button('Edit / Delete', () => select(row))}</View>)}
       <Text style={{ fontSize: 18, marginTop: 20, color: '#102B62' }}>Product Photos · NV-001–NV-032</Text>
-      <Text style={{ fontSize: 15, lineHeight: 25, marginTop: 8, color: '#5D6575' }}>NV Profile ပုံ: JPG / PNG / WebP · 2 MB အထိ။ အကြံပြုဆိုဒ် 1080 × 1080 px (1:1)။ Pixel size သီးသန့်ကန့်သတ်ချက် မရှိပါ။ ပုလင်းနဲ့ စာသားကို အလယ်ပိုင်းမှာထားပြီး အနားပတ်လည် နေရာချန်ပါ။</Text>
+      <Text style={{ fontSize: 15, lineHeight: 25, marginTop: 8, color: '#5D6575' }}>NV Profile ပုံ: JPG / PNG / WebP · မူလဖိုင် 20 MB အထိ။ Upload မတင်မီ အလိုအလျောက် 1 MB အောက် ချုံ့ပေးပါမယ်။ အကြံပြုဆိုဒ် 1080 × 1080 px (1:1)။ Pixel size သီးသန့်ကန့်သတ်ချက် မရှိပါ။ ပုလင်းနဲ့ စာသားကို အလယ်ပိုင်းမှာထားပြီး အနားပတ်လည် နေရာချန်ပါ။</Text>
       {novaCatalog.map(product => { const row = rows.find(r => r.id === product.id); return <View key={product.id} style={field}><Text>{product.id} — {product.name}</Text><Text>{row?.deleted ? 'ပုံဖျက်ထားသည်' : row?.image_url ? 'သိမ်းထားသောပုံ' : 'မူလပုံ'}</Text>{button('ပုံတင် / ပြင် / ဖျက်', () => select(row || blank(product.id)))}</View>; })}
     </> : <View style={field}>
       {button('← ပုံစာရင်းသို့ ပြန်မယ်', backToList)}
       <Text style={{ fontWeight: '700' }}>{draft.id} · {draft.kind === 'product' ? novaCatalog.find(p => p.id === draft.id)?.name : 'Slide'}</Text>
       {draft.image_url ? <Image source={{ uri: draft.image_url }} style={{ width: '100%', height: 190 }} resizeMode="contain" /> : <Text style={{ marginTop: 12 }}>ပုံရွေးပေးပါ။</Text>}
-      <Text style={{ fontSize: 15, lineHeight: 25, marginTop: 8, color: '#5D6575' }}>{draft.kind === 'product' ? 'Product profile: 1080 × 1080 px (1:1) အကြံပြု · JPG / PNG / WebP · 2 MB အထိ' : 'Slide: JPG / PNG / WebP · 2 MB အထိ'}</Text>
+      <Text style={{ fontSize: 15, lineHeight: 25, marginTop: 8, color: '#5D6575' }}>{draft.kind === 'product' ? 'Profile: မူလဖိုင် 20 MB အထိ · အချိုးထိန်းပြီး အရှည်ဆုံးဘက် 1080 px အထိ၊ ဖိုင် 1 MB အောက် ချုံ့တင်ပေးပါမယ်။' : 'Slide: JPG / PNG / WebP · 2 MB အထိ'}</Text>
       {button(busy ? 'ခဏစောင့်ပါ…' : 'Upload / Replace photo', upload)}
       {draft.kind === 'slide' ? <>
         <TextInput accessibilityLabel="Slide title" placeholder="Slide ခေါင်းစဉ်" maxLength={90} value={draft.title} editable={!busy} onChangeText={title => setDraft({ ...draft, title })} style={field}/>

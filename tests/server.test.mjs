@@ -9,7 +9,7 @@ before(async () => {
   const port = 18000 + Math.floor(Math.random() * 1000);
   child = spawn(process.execPath, ['server.mjs'], {
     cwd: new URL('..', import.meta.url),
-    env: { ...process.env, PORT: String(port), OPENAI_API_KEY: '', ANTHROPIC_API_KEY: '', TELEGRAM_BOT_TOKEN: '', TELEGRAM_CHAT_ID: '', NOVA_ORDER_STORAGE_ENABLED: 'false', NOVA_THERMER_PRINT_ENABLED: 'false', NOVA_PRINT_TOKEN_SECRET: '', NOVA_PREVIEW_SUPABASE_SERVICE_ROLE_KEY: '', SUPABASE_URL: '', SUPABASE_ANON_KEY: '', EXPO_PUBLIC_SUPABASE_URL: '', EXPO_PUBLIC_SUPABASE_ANON_KEY: '', EXPO_PUBLIC_NOVA_PREVIEW_SUPABASE_URL: 'https://preview.example.test', EXPO_PUBLIC_NOVA_PREVIEW_SUPABASE_ANON_KEY: 'preview-anon-test-key', SUPABASE_SERVICE_ROLE_KEY: '', NOVA_ADMIN_EMAILS: '' },
+    env: { ...process.env, PORT: String(port), NOVA_AI_AGENT: '', OPEN_AI_KEY: '', OPENAI_API_KEY: '', ANTHROPIC_API_KEY: '', TELEGRAM_BOT_TOKEN: '', TELEGRAM_CHAT_ID: '', NOVA_ORDER_STORAGE_ENABLED: 'false', NOVA_THERMER_PRINT_ENABLED: 'false', NOVA_PRINT_TOKEN_SECRET: '', NOVA_PREVIEW_SUPABASE_SERVICE_ROLE_KEY: '', SUPABASE_URL: '', SUPABASE_ANON_KEY: '', EXPO_PUBLIC_SUPABASE_URL: '', EXPO_PUBLIC_SUPABASE_ANON_KEY: '', EXPO_PUBLIC_NOVA_PREVIEW_SUPABASE_URL: 'https://preview.example.test', EXPO_PUBLIC_NOVA_PREVIEW_SUPABASE_ANON_KEY: 'preview-anon-test-key', SUPABASE_SERVICE_ROLE_KEY: '', NOVA_ADMIN_EMAILS: '' },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   child.stdout.on('data', () => {});
