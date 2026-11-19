@@ -85,7 +85,7 @@ const productImages: Record<string, any> = {
 function Bottle({ p, small = false }: { p: Product; small?: boolean }) {
   const rows = useStorefrontMedia();
   const override = rows?.find(row => row.id === p.id && row.kind === 'product');
-  const source = override ? (!override.deleted && override.enabled && override.image_url ? { uri: override.image_url } : null) : productImages[p.id];
+  const source = override?.deleted || override?.enabled === false ? null : override?.image_url ? { uri: override.image_url } : productImages[p.id];
   if (source) return <View style={[s.bottleWrap, small && s.bottleWrapSmall]}><Image source={source} style={[s.productPhoto, small && s.productPhotoSmall]} resizeMode="contain" /></View>;
   return <View style={[s.bottleWrap, small && s.bottleWrapSmall]}><View style={[s.cap, { backgroundColor: p.accent }, small && s.capSmall]} /><View style={[s.bottle, { backgroundColor: p.color }, small && s.bottleSmall]}><View style={s.shine} /><Text style={[s.bottleMark, small && s.bottleMarkSmall]}>N</Text>{!small && <Text style={s.bottleWord}>NOVA</Text>}</View></View>;
 }
@@ -95,50 +95,32 @@ function Card({ p, onPress }: { p: Product; onPress: () => void }) {
   const cardWidth = narrow ? '100%' : Math.max(142, (Math.min(width, 760) - 60) / 2);
   return <Pressable onPress={onPress} style={({ pressed }) => [s.card, { width: cardWidth }, pressed && s.pressed]}><View style={s.productImage}>{p.tag && <Text style={s.cardTag}>{p.tag}</Text>}<Bottle p={p} small /><Text style={s.heart}>♡</Text></View><View style={s.cardBody}><View style={s.productRow}><Text style={s.productName}>{p.name}</Text><Text style={s.price}>{p.price}</Text></View><Text style={s.family}>{p.family}</Text><Text style={s.notes}>{p.notes}</Text></View></Pressable>;
 }
-// Change this copy when the shop has a new announcement. No unverified offers are shown.
-const HOME_NOTICE = 'NOVA မှ ကြိုဆိုပါတယ် · သင့်အတွက် ရနံ့ကို အတူရွေးချယ်မယ်';
-type Showcase = { title: string; description: string; image_url: string | null; cta: 'discover' | 'advisor'; updated_at?: string };
-function LiveShowcase({ go }: { go: (t: Tab) => void }) {
-  const media = useStorefrontMedia();
-  const [board, setBoard] = useState<Showcase | null>(null);
-  const [activeSlide, setActiveSlide] = useState(0);
+// The managed Live Board is the only home announcement source.
+function BoardImage({ uri, label }: { uri: string; label: string }) {
+  const [ratio, setRatio] = useState(16 / 9);
   useEffect(() => {
     let active = true;
-    const load = async () => {
-      try {
-        const response = await fetch(apiEndpoint('/api/showcase'));
-        if (!response.ok) return;
-        const payload = await response.json();
-        if (active) setBoard(payload.board || null);
-      } catch { /* Show local NOVA collection slides when the event feed is unavailable. */ }
-    };
-    load();
-    const timer = setInterval(load, 30000);
-    return () => { active = false; clearInterval(timer); };
-  }, []);
-  const managedSlides = media?.filter(row => row.kind === 'slide' && row.enabled && !row.deleted);
-  const slides = media !== null ? (managedSlides || []).map(row => ({ id: row.id, title: row.title, description: row.description, image: { uri: row.image_url! }, cta: row.cta as Tab })) : [
-    ...(board ? [{ id: 'event', title: board.title, description: board.description, image: board.image_url ? { uri: board.image_url } : require('./assets/nova-perfume-set.png'), cta: board.cta as Tab }] : []),
-    { id: 'collection', title: 'NOVA Inspired Perfume', description: 'သင့်စိတ်ကြိုက် ရနံ့ကို ရွေးလိုက်ပါ။', image: require('./assets/nova-perfume-set.png'), cta: 'discover' as Tab },
-  ];
-  useEffect(() => {
-    if (!slides.length) return;
-    const timer = setInterval(() => setActiveSlide(index => (index + 1) % slides.length), 4500);
-    return () => clearInterval(timer);
-  }, [slides.length]);
+    Image.getSize(uri, (width, height) => { if (active && width > 0 && height > 0) setRatio(width / height); }, () => {});
+    return () => { active = false; };
+  }, [uri]);
+  return <Image source={{ uri }} resizeMode="contain" style={{ width: '100%', aspectRatio: ratio }} accessibilityLabel={label} />;
+}
+function LiveShowcase({ go }: { go: (t: Tab) => void }) {
+  const media = useStorefrontMedia();
+  const [activeSlide, setActiveSlide] = useState(0);
+  const slides = (media || []).filter(row => row.kind === 'slide' && row.enabled && !row.deleted && row.image_url);
   if (!slides.length) return null;
-  const slide = slides[activeSlide % slides.length];
+  const index = activeSlide % slides.length;
+  const slide = slides[index];
   return <View style={s.showcaseCard}>
-    <Text style={s.showcaseKicker}>NOVA · EVENTS & HIGHLIGHTS</Text>
-    <View style={s.showcaseMain}>
-      <View style={s.showcaseWords}>
-        <Text style={s.showcaseTitle}>{slide.title}</Text>
-        <Text style={s.showcaseCopy}>{slide.description}</Text>
-        <Pressable accessibilityRole="button" accessibilityLabel={slide.cta === 'advisor' ? 'Ask NOVA AI Agent' : 'Explore NOVA collection'} onPress={() => go(slide.cta)} style={s.showcaseButton}><Text style={s.showcaseButtonText}>{slide.cta === 'advisor' ? 'Ask NOVA AI Agent →' : 'Explore Collection →'}</Text></Pressable>
-      </View>
-      <Image source={slide.image} resizeMode="contain" style={s.showcaseImage} accessibilityLabel={slide.title} />
-    </View>
-    <View style={s.showcaseDots}>{slides.map((item, index) => <Pressable key={item.id} accessibilityRole="button" accessibilityLabel={`Show highlight ${index + 1}`} onPress={() => setActiveSlide(index)} style={[s.showcaseDot, index === activeSlide % slides.length && s.showcaseDotActive]} />)}</View>
+    <Pressable accessibilityRole="button" accessibilityLabel={`${slide.title}${slide.description ? '. ' + slide.description : ''}. ${slide.cta === 'advisor' ? 'Ask NOVA AI Agent' : 'Explore NOVA collection'}`} onPress={() => go(slide.cta)}>
+      <BoardImage key={slide.image_url} uri={slide.image_url!} label={slide.title} />
+    </Pressable>
+    {slides.length > 1 ? <View style={s.showcaseControls}>
+      <Pressable accessibilityRole="button" accessibilityLabel="Previous announcement" onPress={() => setActiveSlide((index + slides.length - 1) % slides.length)} style={s.showcaseControl}><Text style={s.showcaseControlText}>ယခင်ပုံ</Text></Pressable>
+      <Text style={s.showcaseControlText}>{index + 1} / {slides.length}</Text>
+      <Pressable accessibilityRole="button" accessibilityLabel="Next announcement" onPress={() => setActiveSlide((index + 1) % slides.length)} style={s.showcaseControl}><Text style={s.showcaseControlText}>နောက်ပုံ</Text></Pressable>
+    </View> : null}
   </View>;
 }
 // Living NOVA mascot: animate the authentic robot image without changing the AI backend.
@@ -215,14 +197,12 @@ function LivingNovaAgent({ size = 92, thinking = false, compact = false }: { siz
 
 function Home({ go, pick }: { go: (t: Tab) => void; pick: (p: Product) => void }) {
   const { width, fontScale } = useWindowDimensions();
-  const heroStack = width < 360 || fontScale > 1.2;
   const adviserStack = width < 360 || fontScale > 1.2 || width > 700;
   const adviserChips = ['Fresh', 'For work', 'By mood'];
   return <ScrollView contentContainerStyle={s.homePage} showsVerticalScrollIndicator={false}>
     <View style={s.homeContent}>
       <View style={s.brandRow}><Image source={require('./assets/nova-logo-authentic.png')} style={s.brandLogo} resizeMode="contain" accessibilityLabel="NOVA" /><View style={s.brandActions}><Pressable accessibilityRole="button" accessibilityLabel="Open your NOVA account" onPress={() => go('profile')} style={s.brandAccount}><Text style={s.brandAccountText}>Account</Text></Pressable></View></View>
       <LiveShowcase go={go} />
-      <View style={[s.hero, heroStack && s.heroStack]}><View style={[s.heroCopyBlock, heroStack && s.heroCopyStack]}><Text style={s.heroKicker}>NOVA FRAGRANCE</Text><Text style={s.heroTitle}>Your scent.{`\n`}Your story.</Text><Text style={s.heroCopy}>သင့်ရဲ့ စတိုင်နဲ့ လိုက်ဖက်မယ့် ရနံ့ကို ရှာဖွေလိုက်ပါ။</Text><Pressable accessibilityRole="button" accessibilityLabel="Explore NOVA scents" onPress={() => go('discover')} style={s.heroButton}><Text style={s.heroButtonText}>Explore scents  →</Text></Pressable></View><Image source={require('./assets/nova-perfume-set.png')} style={[s.heroImage, heroStack && s.heroImageStack]} resizeMode="contain" accessibilityLabel="NOVA perfume set" /></View>
       <View style={[s.adviserCard, adviserStack && s.adviserCardStack]}><Pressable accessibilityRole="button" accessibilityLabel="Chat with NOVA AI Agent" onPress={() => go('advisor')} style={[s.robotFrame, adviserStack && s.robotFrameStack]}><LivingNovaAgent size={adviserStack ? 145 : 92} /></Pressable><View style={[s.adviserWords, adviserStack && s.adviserWordsStack]}><Text style={s.adviserKicker}>A LITTLE HELP, FROM NOVA</Text><Text style={s.adviserTitle}>Meet NOVA AI Agent</Text><Text style={s.adviserCopy}>မေးလိုက်ပါ။ သင့်စိတ်ခံစားချက်နဲ့ အချိန်အခါအလိုက် ရနံ့ရွေးပေးမယ်။</Text><View style={s.adviserChips}>{adviserChips.map(chip => <Pressable key={chip} accessibilityRole="button" accessibilityLabel={`Ask NOVA about ${chip} scents`} onPress={() => go('advisor')} style={s.adviserChip}><Text style={s.adviserChipText}>{chip}</Text></Pressable>)}</View><Pressable accessibilityRole="button" accessibilityLabel="Ask NOVA AI Agent" onPress={() => go('advisor')} style={s.adviserCta}><Text style={s.adviserCtaText}>Ask NOVA  →</Text></Pressable></View></View>
       <View style={s.sectionHead}><View><Text style={s.sectionTitle}>Find your favourite</Text><Text style={s.sectionSub}>NOVA ရနံ့များကို ရှာဖွေပါ</Text></View><Pressable accessibilityRole="button" accessibilityLabel="See all NOVA scents" onPress={() => go('discover')} style={s.seeAllButton}><Text style={s.seeAll}>See all  →</Text></Pressable></View>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.rowList}>{products.slice(0, 3).map(p => <Card key={p.id} p={p} onPress={() => pick(p)} />)}</ScrollView>
@@ -398,6 +378,10 @@ function AuthScreen({ onAuth }: { onAuth: (session: string) => void }) {
   return <SafeAreaView className="flex-1 bg-nova-cream"><ScrollView contentContainerClassName="items-center px-7 pb-12 pt-14" showsVerticalScrollIndicator={false}><View className="h-16 w-16 items-center justify-center rounded-full bg-nova-ink shadow-lg"><Text className="text-3xl font-bold text-nova-gold">N</Text></View><Text className="mt-4 text-lg font-bold tracking-[6px] text-nova-ink">NOVA</Text><Text className="mt-2 text-center text-[15px] text-nova-clay">A more personal way to wear fragrance.</Text><View className="mt-9 w-full rounded-[24px] border border-[#EFE7DD] bg-nova-paper p-6 shadow-xl"><Text className="text-[25px] font-semibold text-nova-ink">{mode === 'login' ? 'Welcome back.' : 'Create your scent space.'}</Text><Text className="mt-2 text-sm leading-5 text-nova-muted">{mode === 'login' ? 'Continue your fragrance journey.' : 'Your preferences will shape every recommendation.'}</Text><TextInput value={email} onChangeText={setEmail} placeholder="Email address" placeholderTextColor="#A39A91" keyboardType="email-address" autoCapitalize="none" className="mt-5 rounded-xl bg-[#F3EEE7] px-4 py-3.5 text-[15px] text-nova-ink"/><TextInput value={password} onChangeText={setPassword} placeholder="Password" placeholderTextColor="#A39A91" secureTextEntry className="mt-2 rounded-xl bg-[#F3EEE7] px-4 py-3.5 text-[15px] text-nova-ink"/><Pressable onPress={submit} disabled={submitting} className="mt-4 items-center rounded-xl bg-nova-ink py-4 active:opacity-80"><Text className="text-[15px] font-bold text-[#F7EEE3]">{submitting ? 'Please wait…' : mode === 'login' ? 'Log in  →' : 'Create account  →'}</Text></Pressable><View className="mt-5 flex-row justify-center"><Text className="text-sm text-nova-muted">{mode === 'login' ? 'New to NOVA?' : 'Already have an account?'}</Text><Pressable onPress={() => setMode(mode === 'login' ? 'signup' : 'login')}><Text className="text-sm font-bold text-nova-clay">{mode === 'login' ? ' Create account' : ' Log in'}</Text></Pressable></View></View>{error ? <Text className="mt-4 text-center text-[13px] leading-4 text-[#A35F4B]">{error}</Text> : null}<Pressable onPress={continueGuest}><Text className="mt-6 text-[15px] font-bold text-nova-clay">Continue as guest for now</Text></Pressable><Text className="mt-3 text-center text-[12px] text-[#B3ABA2]">Guest preferences stay on this device. Signed-in profiles sync when configured.</Text></ScrollView></SafeAreaView>;
 }
 function Detail({ p, close }: { p: Product; close: () => void }) {
+  const media = useStorefrontMedia();
+  const content = media?.find(row => row.kind === 'product' && row.id === p.id);
+  // Empty text means explicitly removed; null/absent retains the catalog copy.
+  const scentDescription = content?.scent_description ?? p.bioMyanmar ?? p.family;
   const [name, setName] = useState(''); const [phone, setPhone] = useState('');
   const [address, setAddress] = useState(''); const [quantity, setQuantity] = useState('1');
   const [size, setSize] = useState<BottleSize | null>(null);
@@ -448,7 +432,7 @@ function Detail({ p, close }: { p: Product; close: () => void }) {
     <Pressable accessibilityRole="button" accessibilityLabel="Close order form" disabled={sending} onPress={close}><Text style={s.back}>‹ ပြန်သွားမယ် / ရေမွှေးပြောင်းရွေးမယ်</Text></Pressable>
     <View style={[s.detailVisual, { height: 180 }]}><Bottle p={p} /></View>
     <Text style={s.eyebrow}>{p.id} · {p.family.toUpperCase()}</Text><Text style={s.detailTitle}>{p.name}</Text>
-    <Text style={s.detailNotes}>{p.notes}</Text><Text style={s.detailDescription}>{p.bioMyanmar || p.family}</Text>
+    <Text style={s.detailNotes}>{p.notes}</Text>{scentDescription ? <Text style={s.detailDescription}>{scentDescription}</Text> : null}
     <Text style={s.detailMeta}>{p.category} · {p.brand} · Inspired by {p.originalReference}</Text>
     <Text style={{ color: '#946D25', fontSize: 13, fontWeight: '700', marginTop: 26 }}>မှာယူရန် · {p.id} — {p.name}</Text>
     <Text style={s.detailDescription}>ရေမွှေးအားလုံး {shopPricing.priceLabel} ပါ။</Text>
@@ -501,18 +485,10 @@ export default function App() {
 }
 
 const s = StyleSheet.create({
-showcaseCard: { backgroundColor: '#102B62', borderRadius: 20, padding: 16, marginBottom: 14, overflow: 'hidden' },
-showcaseKicker: { color: '#E8C977', fontSize: 11, letterSpacing: 1.2, fontWeight: '800' },
-showcaseMain: { minHeight: 190, flexDirection: 'row', alignItems: 'center' },
-showcaseWords: { flex: 1, paddingRight: 6 },
-showcaseTitle: { color: '#FFF9ED', fontSize: 21, lineHeight: 26, fontWeight: '700' },
-showcaseCopy: { color: '#E3E7EF', fontSize: 13, lineHeight: 22, marginTop: 8 },
-showcaseImage: { width: '44%', height: 178 },
-showcaseButton: { marginTop: 12, backgroundColor: '#E8C977', borderRadius: 10, paddingVertical: 11, paddingHorizontal: 10, alignSelf: 'flex-start' },
-showcaseButtonText: { color: '#102B62', fontSize: 12, fontWeight: '800' },
-showcaseDots: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, paddingTop: 4, paddingBottom: 2 },
-showcaseDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#7586A7' },
-showcaseDotActive: { width: 19, backgroundColor: '#E8C977' },
+showcaseCard: { backgroundColor: '#102B62', borderRadius: 20, marginBottom: 14, overflow: 'hidden' },
+showcaseControls: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 12 },
+showcaseControl: { minHeight: 44, minWidth: 64, justifyContent: 'center', alignItems: 'center' },
+showcaseControlText: { color: '#FFF9ED', fontSize: 14 },
 homePage: { paddingBottom: 24 },
 notice: { backgroundColor: '#102B62', paddingHorizontal: 16, paddingVertical: 8, minHeight: 34, flexDirection: 'row', alignItems: 'center', gap: 8 },
 noticeLabel: { color: '#E8C977', fontSize: 10, letterSpacing: 1.2, fontWeight: '800', flexShrink: 1 },
