@@ -4,6 +4,10 @@
 
 /* Keep the app centred and constrained to the viewport on web. */
 html, body, #root { height: 100%; }
-body { margin: 0; background: #FBF7EF; }
+body { margin: 0; background: #EEF0F4; }
 #root { display: flex; flex-direction: column; min-height: 0; }
 #root > div { min-height: 0; }
+
+/* Keyboard focus remains visible on the soft cards and dark header. */
+[role="button"]:focus-visible, [role="tab"]:focus-visible { outline: 2px solid #B98B2A; outline-offset: -3px; }
+input:focus-visible, textarea:focus-visible { outline: 2px solid #B98B2A; outline-offset: 2px; }

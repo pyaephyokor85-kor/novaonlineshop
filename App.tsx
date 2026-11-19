@@ -9,6 +9,9 @@ import AdminRoute from './AdminRoute';
 import { StorefrontMediaProvider, useStorefrontMedia } from './StorefrontMedia';
 import { novaCatalog } from './data/nova-catalog';
 import shopPricing from './data/shop-pricing.json';
+import ShopIcon from './ShopIcon';
+import { FavoritesProvider, useFavorites } from './Favorites';
+import { storefrontCategory, filterStorefront } from './lib/storefront-discovery.mjs';
 type BottleSize = keyof typeof shopPricing.sizes;
 const money = (amount: number) => `${amount.toLocaleString('en-US')} Ks`;
 
@@ -46,7 +49,7 @@ const loadCloudProfile = async (userId: string) => { if (!supabase) return null;
 const saveCloudProfile = async (userId: string, profile: FragranceProfile) => { if (!supabase) return; const { error } = await supabase.from('fragrance_profiles').upsert({ user_id: userId, favorite_families: profile.favoriteFamilies, preferred_notes: profile.preferredNotes, moods: profile.moods, occasions: profile.occasions, dislikes: profile.dislikes, last_recommendation: profile.lastRecommendation }, { onConflict: 'user_id' }); if (error) throw error; };
 const loadCloudPurchases = async (): Promise<PurchaseHistory[]> => { if (!supabase) return []; const { data, error } = await supabase.from('fragrance_purchases').select('product_id,purchased_at,quantity,price').order('purchased_at', { ascending: false }); if (error) throw error; return (data || []).map(row => ({ productId: row.product_id, purchasedAt: row.purchased_at, quantity: row.quantity, price: row.price || undefined })); };
 
-const products: Product[] = novaCatalog.map(p => ({ ...p, family: p.familyLabel, notes: p.family.join(' · '), price: shopPricing.priceLabel, tag: p.category }));
+const products: Product[] = novaCatalog.map(p => ({ ...p, family: p.familyLabel, notes: p.family.join(' · '), price: shopPricing.priceLabel, tag: storefrontCategory(p.category) }));
 const productImages: Record<string, any> = {
   'NV-001': require('./NV-001.jpg'),
   'NV-002': require('./NV-002.jpg'),
@@ -91,9 +94,24 @@ function Bottle({ p, small = false }: { p: Product; small?: boolean }) {
 }
 function Card({ p, onPress }: { p: Product; onPress: () => void }) {
   const { width, fontScale } = useWindowDimensions();
+  const favorites = useFavorites();
+  const saved = favorites.ids.includes(p.id);
   const narrow = width < 360 || fontScale > 1.2;
-  const cardWidth = narrow ? '100%' : Math.max(142, (Math.min(width, 760) - 60) / 2);
-  return <Pressable onPress={onPress} style={({ pressed }) => [s.card, { width: cardWidth }, pressed && s.pressed]}><View style={s.productImage}>{p.tag && <Text style={s.cardTag}>{p.tag}</Text>}<Bottle p={p} small /><Text style={s.heart}>♡</Text></View><View style={s.cardBody}><View style={s.productRow}><Text style={s.productName}>{p.name}</Text><Text style={s.price}>{p.price}</Text></View><Text style={s.family}>{p.family}</Text><Text style={s.notes}>{p.notes}</Text></View></Pressable>;
+  const cardWidth = narrow ? '100%' : (Math.min(width, 760) - 44) / 2;
+  return <View style={[s.card, { width: cardWidth }]}>
+    <Pressable accessibilityRole="button" accessibilityLabel={`View ${p.id} ${p.name} and order`} onPress={onPress} style={({ pressed }) => [s.cardLink, pressed && s.pressed]}>
+      <View style={s.productImage}><Bottle p={p} small /></View>
+      <View style={s.cardBody}>
+        <View style={[s.productBadge, p.tag === 'Women' ? s.badgeWomen : p.tag === 'Unisex' ? s.badgeUnisex : null]}><Text style={s.cardTag}>{p.tag}</Text></View>
+        <Text style={s.productCode}>{p.id}</Text>
+        <Text style={s.productName}>{p.name}</Text>
+        <Text style={s.family}>{p.family}</Text>
+        <View style={s.priceLine}><Text style={s.price}>{money(shopPricing.sizes['10ml'])}</Text><Text style={s.cardSize}>10ml</Text></View>
+        <Text style={s.alternatePrice}>30ml · {money(shopPricing.sizes['30ml'])}</Text>
+      </View>
+    </Pressable>
+    <Pressable accessibilityRole="button" accessibilityLabel={`${saved ? 'Remove' : 'Save'} ${p.id} ${p.name}${saved ? ' from' : ' to'} saved scents`} accessibilityState={{ selected: saved, disabled: !favorites.ready }} disabled={!favorites.ready} onPress={() => favorites.toggle(p.id)} style={s.favoriteButton}><ShopIcon name="heart" size={21} color={saved ? '#A97A23' : '#596170'} filled={saved} /></Pressable>
+  </View>;
 }
 // The managed Live Board is the only home announcement source.
 function BoardImage({ uri, label }: { uri: string; label: string }) {
@@ -195,26 +213,68 @@ function LivingNovaAgent({ size = 92, thinking = false, compact = false }: { siz
   </View>;
 }
 
-function Home({ go, pick }: { go: (t: Tab) => void; pick: (p: Product) => void }) {
+const categories = ['All', 'Men', 'Women', 'Unisex'];
+function CategoryTabs({ value, onChange }: { value: string; onChange: (category: string) => void }) {
+  return <View accessibilityRole="tablist" accessibilityLabel="Scent categories" style={s.categoryTabs}>{categories.map(category => <Pressable key={category} accessibilityRole="tab" accessibilityState={{ selected: value === category }} onPress={() => onChange(category)} style={[s.categoryTab, value === category && s.categoryTabActive]}><Text style={[s.categoryLabel, value === category && s.categoryLabelActive]}>{category}</Text></Pressable>)}</View>;
+}
+function ScentSearch({ value, onChange, onSubmit, dark = false }: { value: string; onChange: (text: string) => void; onSubmit?: () => void; dark?: boolean }) {
+  return <View style={[s.scentSearch, dark && s.scentSearchDark]}><ShopIcon name="search" size={21} color="#657083" /><TextInput accessibilityLabel="Search scents by NV code, name or family" placeholder="Search your scent / NV code" placeholderTextColor="#727A86" value={value} onChangeText={onChange} onSubmitEditing={onSubmit} returnKeyType="search" autoCorrect={false} autoCapitalize="none" maxLength={100} style={s.scentSearchInput} />{value ? <Pressable accessibilityRole="button" accessibilityLabel="Clear scent search" onPress={() => onChange('')} style={s.clearSearch}><ShopIcon name="close" size={18} /></Pressable> : null}</View>;
+}
+function EmptyScents({ reset }: { reset: () => void }) {
+  return <View style={s.emptyScents}><Text style={s.emptyTitle}>ရနံ့ မတွေ့သေးပါ</Text><Text style={s.emptyCopy}>Search နဲ့ Category ကို ပြောင်းရွေးပါ။ Saved စာရင်းအတွက် ရနံ့ပေါ်က Heart ကို နှိပ်ထားနိုင်ပါတယ်။</Text><Pressable accessibilityRole="button" onPress={reset} style={s.emptyReset}><Text style={s.emptyResetText}>ရနံ့အားလုံး ပြန်ကြည့်မယ်</Text></Pressable></View>;
+}
+type CollectionState = { query: string; category: string; savedOnly: boolean };
+function Home({ go, pick, collection, setCollection, ask }: { go: (t: Tab) => void; pick: (p: Product) => void; collection: CollectionState; setCollection: (state: CollectionState) => void; ask: (prompt: string) => void }) {
   const { width, fontScale } = useWindowDimensions();
-  const adviserStack = width < 360 || fontScale > 1.2 || width > 700;
-  const adviserChips = ['Fresh', 'For work', 'By mood'];
-  return <ScrollView contentContainerStyle={s.homePage} showsVerticalScrollIndicator={false}>
+  const stack = width < 360 || fontScale > 1.2;
+  const favorites = useFavorites();
+  const matches: Product[] = filterStorefront(products, { ...collection, favoriteIds: favorites.ids });
+  const visible = collection.query || collection.savedOnly ? matches : matches.slice(0, 4);
+  const reset = () => setCollection({ query: '', category: 'All', savedOnly: false });
+  const prompts = [
+    ['Fresh', 'လတ်ဆတ်ပြီး ပေါ့ပါးတဲ့ ရနံ့တစ်မျိုး ရွေးပေးပါ။'],
+    ['For Work', 'ရုံးတက်ဖို့ သင့်တော်တဲ့ ရနံ့တစ်မျိုး ရွေးပေးပါ။'],
+    ['By Mood', 'ကျွန်တော့် စိတ်ခံစားချက်နဲ့ လိုက်မယ့် ရနံ့ကို အတူရွေးချယ်ချင်ပါတယ်။'],
+  ];
+  return <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={s.homePage} showsVerticalScrollIndicator={false}>
+    <View style={s.homeHeader}>
+      <View style={s.brandRow}><View style={{ width: 44 }} /><Image source={require('./assets/nova-logo-authentic.png')} style={s.brandLogo} resizeMode="contain" accessibilityLabel="NOVA Inspired Perfume" /><Pressable accessibilityRole="button" accessibilityLabel="Open your NOVA account" onPress={() => go('profile')} style={s.brandAccount}><ShopIcon name="profile" size={23} color="#E8C977" /></Pressable></View>
+      <ScentSearch dark value={collection.query} onChange={query => setCollection({ ...collection, query, category: query ? 'All' : collection.category })} onSubmit={() => go('discover')} />
+    </View>
+    <LiveShowcase go={go} />
     <View style={s.homeContent}>
-      <View style={s.brandRow}><Image source={require('./assets/nova-logo-authentic.png')} style={s.brandLogo} resizeMode="contain" accessibilityLabel="NOVA" /><View style={s.brandActions}><Pressable accessibilityRole="button" accessibilityLabel="Open your NOVA account" onPress={() => go('profile')} style={s.brandAccount}><Text style={s.brandAccountText}>Account</Text></Pressable></View></View>
-      <LiveShowcase go={go} />
-      <View style={[s.adviserCard, adviserStack && s.adviserCardStack]}><Pressable accessibilityRole="button" accessibilityLabel="Chat with NOVA AI Agent" onPress={() => go('advisor')} style={[s.robotFrame, adviserStack && s.robotFrameStack]}><LivingNovaAgent size={adviserStack ? 145 : 92} /></Pressable><View style={[s.adviserWords, adviserStack && s.adviserWordsStack]}><Text style={s.adviserKicker}>A LITTLE HELP, FROM NOVA</Text><Text style={s.adviserTitle}>Meet NOVA AI Agent</Text><Text style={s.adviserCopy}>မေးလိုက်ပါ။ သင့်စိတ်ခံစားချက်နဲ့ အချိန်အခါအလိုက် ရနံ့ရွေးပေးမယ်။</Text><View style={s.adviserChips}>{adviserChips.map(chip => <Pressable key={chip} accessibilityRole="button" accessibilityLabel={`Ask NOVA about ${chip} scents`} onPress={() => go('advisor')} style={s.adviserChip}><Text style={s.adviserChipText}>{chip}</Text></Pressable>)}</View><Pressable accessibilityRole="button" accessibilityLabel="Ask NOVA AI Agent" onPress={() => go('advisor')} style={s.adviserCta}><Text style={s.adviserCtaText}>Ask NOVA  →</Text></Pressable></View></View>
-      <View style={s.sectionHead}><View><Text style={s.sectionTitle}>Find your favourite</Text><Text style={s.sectionSub}>NOVA ရနံ့များကို ရှာဖွေပါ</Text></View><Pressable accessibilityRole="button" accessibilityLabel="See all NOVA scents" onPress={() => go('discover')} style={s.seeAllButton}><Text style={s.seeAll}>See all  →</Text></Pressable></View>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.rowList}>{products.slice(0, 3).map(p => <Card key={p.id} p={p} onPress={() => pick(p)} />)}</ScrollView>
+      <View style={[s.adviserCard, stack && s.adviserCardStack]}>
+        <View style={[s.adviserTop, stack && s.adviserTopStack]}>
+          <Pressable accessibilityRole="button" accessibilityLabel="Chat with NOVA AI Agent" onPress={() => ask('')} style={s.robotFrame}><LivingNovaAgent size={stack ? 98 : 82} /></Pressable>
+          <View style={s.adviserWords}><Text style={s.adviserTitle}>Meet NOVA AI Agent</Text><Text style={s.adviserCopy}>Let’s find your scent.</Text><View style={s.adviserChips}>{prompts.map(([label, prompt]) => <Pressable key={label} accessibilityRole="button" accessibilityLabel={`Ask NOVA: ${label}`} onPress={() => ask(prompt)} style={s.adviserChip}><Text style={s.adviserChipText}>{label}</Text></Pressable>)}</View></View>
+        </View>
+        <Pressable accessibilityRole="button" accessibilityLabel="Ask NOVA AI Agent" onPress={() => ask('')} style={s.adviserCta}><Text style={s.adviserCtaText}>Ask NOVA</Text></Pressable>
+      </View>
+      <View style={s.sectionHead}><Text style={s.sectionTitle}>Discover Scents</Text><Pressable accessibilityRole="button" accessibilityLabel="Show saved scents" accessibilityState={{ selected: collection.savedOnly }} onPress={() => setCollection({ ...collection, savedOnly: !collection.savedOnly })} style={[s.savedFilter, collection.savedOnly && s.savedFilterActive]}><ShopIcon name="heart" size={16} color="#A97A23" filled={collection.savedOnly} /><Text style={s.savedFilterText}>{favorites.ids.length}</Text></Pressable></View>
+      <CategoryTabs value={collection.category} onChange={category => setCollection({ ...collection, category })} />
+      {favorites.error ? <Text accessibilityRole="alert" style={s.storeNotice}>{favorites.error}</Text> : null}
+      {collection.query || collection.savedOnly ? <Text accessibilityLiveRegion="polite" style={s.resultCount}>{collection.savedOnly ? 'Saved on this device · ' : ''}{matches.length} scents</Text> : null}
+      <View style={s.grid}>{visible.map(p => <Card key={p.id} p={p} onPress={() => pick(p)} />)}</View>
+      {!matches.length ? <EmptyScents reset={reset} /> : visible.length < matches.length ? <Pressable accessibilityRole="button" accessibilityLabel={`View all ${matches.length} ${collection.category} scents`} onPress={() => go('discover')} style={s.viewCollection}><Text style={s.viewCollectionText}>View all {matches.length} scents</Text></Pressable> : null}
+      <Text style={s.collectionFootnote}>NOVA Inspired Perfume · EDP</Text>
     </View>
   </ScrollView>;
 }
-function Discover({ pick }: { pick: (p: Product) => void }) {
-  const { width, fontScale } = useWindowDimensions();
-  const singleColumn = width < 360 || fontScale > 1.2;
-  const [filter, setFilter] = useState('All'); const filters = ['All', 'Woody', 'Floral', 'Fresh', 'Oud'];
-  const list = filter === 'All' ? products : products.filter(p => p.family.toLowerCase().includes(filter.toLowerCase()));
-  return <ScrollView contentContainerStyle={s.page} showsVerticalScrollIndicator={false}><View style={s.top}><View><Text style={s.eyebrow}>THE COLLECTION</Text><Text style={s.heading}>Discover NOVA.</Text></View><Text style={s.search}>⌕</Text></View><Text style={s.intro}>32 compositions. Infinite ways to be remembered.</Text><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.filters}>{filters.map(f => <Pressable key={f} onPress={() => setFilter(f)} style={[s.filter, filter === f && s.filterOn]}><Text style={[s.filterText, filter === f && s.filterTextOn]}>{f}</Text></Pressable>)}</ScrollView><View style={[s.grid, singleColumn && s.gridSingle]}>{list.map(p => <Card key={p.id} p={p} onPress={() => pick(p)} />)}</View></ScrollView>;
+function Discover({ pick, collection, setCollection }: { pick: (p: Product) => void; collection: CollectionState; setCollection: (state: CollectionState) => void }) {
+  const favorites = useFavorites();
+  const [family, setFamily] = useState('All');
+  const families = ['All', 'Woody', 'Floral', 'Fresh', 'Oud'];
+  const list: Product[] = filterStorefront(products, { ...collection, family, favoriteIds: favorites.ids });
+  const reset = () => { setFamily('All'); setCollection({ query: '', category: 'All', savedOnly: false }); };
+  return <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={s.discoverPage} showsVerticalScrollIndicator={false}>
+    <Text style={s.collectionEyebrow}>THE NOVA COLLECTION</Text><View style={s.sectionHead}><Text style={s.discoverTitle}>Discover Scents</Text><Pressable accessibilityRole="button" accessibilityLabel="Show saved scents" accessibilityState={{ selected: collection.savedOnly }} onPress={() => setCollection({ ...collection, savedOnly: !collection.savedOnly })} style={[s.savedFilter, collection.savedOnly && s.savedFilterActive]}><ShopIcon name="heart" size={16} color="#A97A23" filled={collection.savedOnly} /><Text style={s.savedFilterText}>{favorites.ids.length}</Text></Pressable></View>
+    <ScentSearch value={collection.query} onChange={query => setCollection({ ...collection, query })} />
+    <CategoryTabs value={collection.category} onChange={category => setCollection({ ...collection, category })} />
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.filters}>{families.map(value => <Pressable key={value} accessibilityRole="button" accessibilityLabel={`Filter ${value} scent families`} accessibilityState={{ selected: value === family }} onPress={() => setFamily(value)} style={[s.filter, value === family && s.filterOn]}><Text style={[s.filterText, value === family && s.filterTextOn]}>{value === 'All' ? 'All families' : value}</Text></Pressable>)}</ScrollView>
+    <Text accessibilityLiveRegion="polite" style={s.resultCount}>{collection.savedOnly ? 'Saved on this device · ' : ''}{list.length} scents</Text>
+    {favorites.error ? <Text accessibilityRole="alert" style={s.storeNotice}>{favorites.error}</Text> : null}
+    <View style={s.grid}>{list.map(p => <Card key={p.id} p={p} onPress={() => pick(p)} />)}</View>{!list.length ? <EmptyScents reset={reset} /> : null}
+  </ScrollView>;
 }
 const API_URL = (process.env.EXPO_PUBLIC_API_URL || '').replace(/\/$/, '');
 const apiEndpoint = (route: string) => {
@@ -243,8 +303,8 @@ const isAdvisorResponse = (value: unknown): value is { reply: string; profile?: 
   && (value.profile == null || isAdvisorProfile(value.profile))
   && (value.recommendations == null || (Array.isArray(value.recommendations) && value.recommendations.every(isAdvisorRecommendation)));
 
-function Advisor({ pick }: { pick: (p: Product) => void }) {
-  const [input, setInput] = useState(''); const [loading, setLoading] = useState(false); const [profile, setProfile] = useState<FragranceProfile>(emptyProfile); const [profileId, setProfileId] = useState(''); const [purchaseHistory, setPurchaseHistory] = useState<PurchaseHistory[]>([]);
+function Advisor({ pick, initialPrompt = '' }: { pick: (p: Product) => void; initialPrompt?: string }) {
+  const [input, setInput] = useState(initialPrompt); const [loading, setLoading] = useState(false); const [profile, setProfile] = useState<FragranceProfile>(emptyProfile); const [profileId, setProfileId] = useState(''); const [purchaseHistory, setPurchaseHistory] = useState<PurchaseHistory[]>([]);
   const [messages, setMessages] = useState<Message[]>([{ id: '1', from: 'nova', text: 'မင်္ဂလာပါ ဘရို 😊 NOVA ပါ။ ဘာကူညီပေးရမလဲ။' }]);
   useEffect(() => { getProfileId().then(async id => { setProfileId(id); try { if (isCloudUser(id)) { const cloud = await loadCloudProfile(id); setProfile(cloud || emptyProfile); } else { setProfile(await loadGuestProfile(id)); } } catch {} }); }, []);
   useEffect(() => { if (isCloudUser(profileId)) loadCloudPurchases().then(setPurchaseHistory).catch(() => {}); }, [profileId]);
@@ -458,6 +518,10 @@ function Detail({ p, close }: { p: Product; close: () => void }) {
 }
 function StorefrontApp() {
   const [tab, setTab] = useState<Tab>('home');
+  const [collection, setCollection] = useState<CollectionState>({ query: '', category: 'All', savedOnly: false });
+  const [advisorPrompt, setAdvisorPrompt] = useState('');
+  const ask = (prompt: string) => { setAdvisorPrompt(prompt); setTab('advisor'); };
+  const navigate = (next: Tab) => { if (next === 'advisor') setAdvisorPrompt(''); setTab(next); };
   const [selected, setSelected] = useState<Product | null>(null);
   const [session, setSession] = useState<string | null>(null);
   const [booting, setBooting] = useState(true);
@@ -477,27 +541,77 @@ function StorefrontApp() {
     })();
     return () => { active = false; subscription?.unsubscribe(); };
   }, []);
- if (booting) return <SafeAreaView style={s.auth}><StatusBar style="dark" /></SafeAreaView>; const screen = tab === 'home' ? <Home go={setTab} pick={setSelected} /> : tab === 'discover' ? <Discover pick={setSelected} /> : tab === 'advisor' ? <Advisor pick={setSelected} /> : !session ? <AuthScreen onAuth={setSession} /> : <Profile onSignOut={async () => { if (supabase) await supabase.auth.signOut(); await AsyncStorage.removeItem('@nova/local-session'); setTab('home'); setSelected(null); setSession(null); }} />; return <SafeAreaView style={s.app}><StatusBar style="dark" />{screen}<View style={s.nav}>{([['home', '⌂', 'Home'], ['discover', '◒', 'Discover'], ['advisor', '✦', 'AI Agent'], ['profile', '○', 'Profile']] as const).map(([key, icon, label]) => <Pressable key={key} onPress={() => setTab(key)} style={s.navItem}>{key === 'advisor' ? <LivingNovaAgent size={32} compact /> : <Text style={[s.navIcon, tab === key && s.navActive]}>{icon}</Text>}<Text style={[s.navLabel, tab === key && s.navActive]}>{label}</Text></Pressable>)}{tab === 'home' && Platform.OS === 'web' ? <Pressable accessibilityRole="button" accessibilityLabel="Admin and staff login" onPress={() => window.location.assign('/admin')} style={s.navItem}><Text style={s.navIcon}>🔐</Text><Text style={s.navLabel}>Admin / Staff</Text></Pressable> : null}</View><Modal visible={Boolean(selected)} animationType="slide" onRequestClose={() => {}}>{selected ? <Detail key={selected.id} p={selected} close={() => setSelected(null)} /> : null}</Modal></SafeAreaView>; }
+  if (booting) return <SafeAreaView style={s.auth}><StatusBar style="dark" /></SafeAreaView>;
+  const screen = tab === 'home' ? <Home go={navigate} pick={setSelected} collection={collection} setCollection={setCollection} ask={ask} />
+    : tab === 'discover' ? <Discover pick={setSelected} collection={collection} setCollection={setCollection} />
+    : tab === 'advisor' ? <Advisor pick={setSelected} initialPrompt={advisorPrompt} />
+    : !session ? <AuthScreen onAuth={setSession} /> : <Profile onSignOut={async () => { if (supabase) await supabase.auth.signOut(); await AsyncStorage.removeItem('@nova/local-session'); setTab('home'); setSelected(null); setSession(null); }} />;
+  return <SafeAreaView style={s.app}><StatusBar style={tab === 'home' ? 'light' : 'dark'} />{screen}
+    <View style={s.nav}>{([['home', 'home', 'Home'], ['discover', 'search', 'Discover'], ['advisor', null, 'AI Agent'], ['profile', 'profile', 'Profile']] as const).map(([key, icon, label]) => <Pressable key={key} accessibilityRole="button" accessibilityLabel={label} accessibilityState={{ selected: tab === key }} onPress={() => navigate(key)} style={s.navItem}>{icon ? <ShopIcon name={icon} size={24} color={tab === key ? '#102B62' : '#6B7280'} filled={key === 'home' && tab === key} /> : <LivingNovaAgent size={28} compact />}<Text style={[s.navLabel, tab === key && s.navActive]}>{label}</Text><View style={[s.navIndicator, tab === key && s.navIndicatorActive]} /></Pressable>)}
+      {Platform.OS === 'web' ? <Pressable accessibilityRole="button" accessibilityLabel="Admin and staff login" onPress={() => window.location.assign('/admin')} style={s.navItem}><ShopIcon name="lock" size={23} color="#6B7280" /><Text style={s.navLabel}>Admin / Staff</Text><View style={s.navIndicator} /></Pressable> : null}
+    </View>
+    <Modal visible={Boolean(selected)} animationType="slide" onRequestClose={() => {}}>{selected ? <Detail key={selected.id} p={selected} close={() => setSelected(null)} /> : null}</Modal>
+  </SafeAreaView>;
+}
 
 export default function App() {
   const isAdminRoute = Platform.OS === 'web' && typeof window !== 'undefined' && window.location.pathname.replace(/\/+$/, '') === '/admin';
-  return <SafeAreaProvider>{isAdminRoute ? <AdminRoute /> : <StorefrontMediaProvider><StorefrontApp /></StorefrontMediaProvider>}</SafeAreaProvider>;
+  return <SafeAreaProvider>{isAdminRoute ? <AdminRoute /> : <StorefrontMediaProvider><FavoritesProvider><StorefrontApp /></FavoritesProvider></StorefrontMediaProvider>}</SafeAreaProvider>;
 }
 
 const s = StyleSheet.create({
-showcaseCard: { backgroundColor: '#102B62', borderRadius: 20, marginBottom: 14, overflow: 'hidden' },
+homeHeader: { backgroundColor: '#0C1F43', paddingHorizontal: 16, paddingTop: 5, paddingBottom: 15 },
+scentSearch: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E2DDD4', minHeight: 46, borderRadius: 25, paddingLeft: 15, paddingRight: 3, gap: 9 },
+scentSearchDark: { borderColor: '#FFFFFF' },
+scentSearchInput: { flex: 1, minWidth: 0, paddingVertical: 12, fontSize: 16, color: '#102B62' },
+clearSearch: { width: 42, minHeight: 42, alignItems: 'center', justifyContent: 'center' },
+adviserTop: { flexDirection: 'row', alignItems: 'center' },
+adviserTopStack: { flexDirection: 'column', alignItems: 'stretch' },
+categoryTabs: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: '#E2DDD4', marginBottom: 14 },
+categoryTab: { flex: 1, minHeight: 47, alignItems: 'center', justifyContent: 'center', borderBottomWidth: 3, borderBottomColor: 'transparent' },
+categoryTabActive: { borderBottomColor: '#C89933' },
+categoryLabel: { color: '#727887', fontSize: 16 },
+categoryLabelActive: { color: '#102B62', fontWeight: '700' },
+savedFilter: { minWidth: 44, minHeight: 44, paddingHorizontal: 10, borderRadius: 22, gap: 5, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
+savedFilterActive: { backgroundColor: '#F5EBD4' },
+savedFilterText: { color: '#986E20', fontSize: 14, fontWeight: '600' },
+cardLink: { flex: 1 },
+favoriteButton: { position: 'absolute', top: 4, right: 4, minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFFEE', borderRadius: 22 },
+productBadge: { alignSelf: 'flex-start', backgroundColor: '#EDF0F6', borderRadius: 7, paddingHorizontal: 8, paddingVertical: 1, marginBottom: 5 },
+badgeWomen: { backgroundColor: '#F9E8EC' },
+badgeUnisex: { backgroundColor: '#F4ECD9' },
+productCode: { color: '#727A87', fontSize: 14, lineHeight: 20, letterSpacing: .3 },
+priceLine: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', columnGap: 9, rowGap: 4, marginTop: 13 },
+cardSize: { color: '#667080', fontSize: 14, borderLeftWidth: 1, borderLeftColor: '#D9D8D4', paddingLeft: 9 },
+alternatePrice: { color: '#667080', fontSize: 13, lineHeight: 20, marginTop: 5 },
+viewCollection: { alignItems: 'center', justifyContent: 'center', minHeight: 46, borderWidth: 1, borderColor: '#DAC79F', borderRadius: 24, marginTop: 18 },
+viewCollectionText: { fontSize: 15, color: '#102B62', fontWeight: '600' },
+collectionFootnote: { color: '#7A808C', fontSize: 13, textAlign: 'center', marginTop: 22 },
+discoverPage: { paddingHorizontal: 16, paddingTop: 26, paddingBottom: 28 },
+collectionEyebrow: { color: '#9C742C', fontSize: 12, letterSpacing: 1.6, fontWeight: '700', marginBottom: 5 },
+discoverTitle: { fontSize: 30, color: '#102B62', fontWeight: '700', fontFamily: Platform.OS === 'android' ? 'serif' : 'Georgia', flexShrink: 1, marginBottom: 12 },
+resultCount: { color: '#697382', fontSize: 14, lineHeight: 22, marginBottom: 12 },
+storeNotice: { color: '#9E3F35', fontSize: 14, lineHeight: 23, marginBottom: 12 },
+emptyScents: { backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E6DFD3', padding: 22, borderRadius: 18, marginTop: 6 },
+emptyTitle: { color: '#102B62', fontSize: 19, fontWeight: '700' },
+emptyCopy: { color: '#697382', fontSize: 15, lineHeight: 26, marginTop: 8 },
+emptyReset: { minHeight: 46, justifyContent: 'center', alignSelf: 'flex-start', marginTop: 10 },
+emptyResetText: { color: '#946D25', fontSize: 15, fontWeight: '700' },
+navIndicator: { height: 3, width: 32, borderRadius: 2, marginTop: 6, backgroundColor: 'transparent' },
+navIndicatorActive: { backgroundColor: '#C89933' },
+showcaseCard: { backgroundColor: '#0C1F43', overflow: 'hidden' },
 showcaseControls: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 12 },
 showcaseControl: { minHeight: 44, minWidth: 64, justifyContent: 'center', alignItems: 'center' },
 showcaseControlText: { color: '#FFF9ED', fontSize: 14 },
-homePage: { paddingBottom: 24 },
+homePage: { paddingBottom: 28 },
 notice: { backgroundColor: '#102B62', paddingHorizontal: 16, paddingVertical: 8, minHeight: 34, flexDirection: 'row', alignItems: 'center', gap: 8 },
 noticeLabel: { color: '#E8C977', fontSize: 10, letterSpacing: 1.2, fontWeight: '800', flexShrink: 1 },
 noticeCopy: { color: '#FFF9ED', fontSize: 12, lineHeight: 20, flex: 1 },
-homeContent: { paddingHorizontal: 18 },
-brandRow: { backgroundColor: '#102B62', borderRadius: 16, alignItems: 'center', justifyContent: 'center', paddingTop: 18, paddingBottom: 12, marginBottom: 16, gap: 10 },
-brandLogo: { width: 160, height: 82 },
+homeContent: { paddingHorizontal: 16, paddingTop: 14 },
+brandRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 77, paddingBottom: 10 },
+brandLogo: { width: 108, height: 70 },
 brandActions: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-brandAccount: { minWidth: 44, minHeight: 44, paddingHorizontal: 8, alignItems: 'center', justifyContent: 'center' },
+brandAccount: { width: 42, height: 42, borderRadius: 21, borderWidth: 1, borderColor: '#B79449', backgroundColor: '#172F55', alignItems: 'center', justifyContent: 'center' },
 brandAccountText: { color: '#FFF9ED', fontSize: 13, fontWeight: '700' },
 hero: { minHeight: 224, backgroundColor: '#102B62', borderRadius: 20, padding: 18, overflow: 'hidden', flexDirection: 'row', alignItems: 'center', marginBottom: 14 },
 heroCopyBlock: { flex: 1, zIndex: 1 },
@@ -510,46 +624,46 @@ heroCopyStack: { width: '100%' },
 heroImageStack: { width: '100%', maxWidth: 230, height: 150, alignSelf: 'center', marginTop: 4, marginRight: 0, marginLeft: 0 },
 heroButton: { minHeight: 44, alignSelf: 'flex-start', justifyContent: 'center', paddingHorizontal: 14, borderRadius: 10, backgroundColor: '#E8C977', marginTop: 13 },
 heroButtonText: { color: '#102B62', fontSize: 13, fontWeight: '800' },
-adviserCard: { backgroundColor: '#F2E9DA', borderRadius: 18, padding: 15, minHeight: 174, flexDirection: 'row', alignItems: 'center', overflow: 'hidden', marginBottom: 26, borderWidth: 1, borderColor: '#E4D6C2' },
-adviserWords: { flex: 1, paddingLeft: 10 },
+adviserCard: { backgroundColor: '#FFFFFF', borderRadius: 18, padding: 13, marginBottom: 22, borderWidth: 1, borderColor: '#E6DFD3', shadowColor: '#102B62', shadowOpacity: .06, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 2 },
+adviserWords: { flex: 1, minWidth: 0, paddingLeft: 11 },
 adviserKicker: { color: '#946D25', fontSize: 10, letterSpacing: 1.1, fontWeight: '800' },
-adviserTitle: { color: '#102B62', fontSize: 19, lineHeight: 24, fontWeight: '700', marginTop: 6 },
-adviserCopy: { color: '#665D55', fontSize: 13, lineHeight: 21, marginTop: 6 },
-adviserChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 5, marginTop: 10 },
-adviserChip: { minHeight: 34, paddingHorizontal: 10, borderRadius: 17, justifyContent: 'center', backgroundColor: '#FFFDF9', borderWidth: 1, borderColor: '#D9C7AC' },
-adviserChipText: { color: '#5D4C3E', fontSize: 12, fontWeight: '700' },
-robotFrame: { width: 92, height: 122, borderRadius: 16, backgroundColor: '#FFFFFF', overflow: 'hidden', justifyContent: 'center', alignItems: 'center' },
+adviserTitle: { color: '#102B62', fontSize: 21, lineHeight: 27, fontWeight: '700', fontFamily: Platform.OS === 'android' ? 'serif' : 'Georgia' },
+adviserCopy: { color: '#677080', fontSize: 15, lineHeight: 22, marginTop: 3 },
+adviserChips: { flexDirection: 'row', flexWrap: 'wrap', columnGap: 5, rowGap: 6, marginTop: 9 },
+adviserChip: { minHeight: 36, paddingHorizontal: 9, borderRadius: 18, justifyContent: 'center', backgroundColor: '#FFFDFA', borderWidth: 1, borderColor: '#DCC79C' },
+adviserChipText: { color: '#3E4B60', fontSize: 14 },
+robotFrame: { width: 82, minHeight: 100, overflow: 'hidden', justifyContent: 'center', alignItems: 'center', backgroundColor: '#FFFFFF' },
 agentEyelid: { position: 'absolute', backgroundColor: '#244A8B', borderRadius: 99, alignItems: 'center', justifyContent: 'center' },
 agentClosedEye: { width: '74%', height: 1.5, backgroundColor: '#D9B96C', borderRadius: 3 },
 agentThinkingGlow: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderWidth: 2, borderColor: '#D7AD56', borderRadius: 16 },
 agentHeaderIdentity: { flexDirection: 'row', alignItems: 'center', gap: 10, flexShrink: 1 },
 robotImage: { width: '100%', height: '100%' },
-adviserCardStack: { flexDirection: 'column', alignItems: 'stretch' },
+adviserCardStack: { alignItems: 'stretch' },
 adviserWordsStack: { width: '100%', paddingRight: 0 },
 robotFrameStack: { width: '100%', height: 150, marginBottom: 12 },
-adviserCta: { minHeight: 44, alignSelf: 'flex-start', justifyContent: 'center', marginTop: 8, paddingHorizontal: 2 },
-adviserCtaText: { color: '#102B62', fontSize: 14, fontWeight: '800' },
-sectionHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 12 },
-sectionTitle: { color: '#102B62', fontSize: 19, fontWeight: '700' },
+adviserCta: { minHeight: 44, alignSelf: 'stretch', alignItems: 'center', justifyContent: 'center', marginTop: 11, borderRadius: 24, backgroundColor: '#102B62' },
+adviserCtaText: { color: '#FFFFFF', fontSize: 17, fontWeight: '700', letterSpacing: .2 },
+sectionHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 4 },
+sectionTitle: { color: '#102B62', fontSize: 27, lineHeight: 35, fontWeight: '700', flexShrink: 1, fontFamily: Platform.OS === 'android' ? 'serif' : 'Georgia' },
 sectionSub: { color: '#9B968E', fontSize: 13, marginTop: 4 },
 seeAllButton: { minHeight: 44, justifyContent: 'center', paddingLeft: 8 },
 seeAll: { color: '#946D25', fontWeight: '800', fontSize: 13 },
 rowList: { gap: 12, paddingBottom: 10 },
-card: { width: 188, backgroundColor: '#FFFDF9', borderRadius: 16, overflow: 'hidden', marginRight: 0 },
-productImage: { height: 158, backgroundColor: '#F0E9DE', justifyContent: 'center', alignItems: 'center', position: 'relative' },
-cardTag: { position: 'absolute', top: 10, left: 10, fontSize: 10, color: '#946D25', fontWeight: '800', letterSpacing: .5 },
+card: { backgroundColor: '#FFFFFF', borderRadius: 18, overflow: 'hidden', borderWidth: 1, borderColor: '#ECE8E0', shadowColor: '#102B62', shadowOpacity: .05, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 1 },
+productImage: { height: 162, backgroundColor: '#FFFFFF', justifyContent: 'center', alignItems: 'center', position: 'relative', paddingTop: 8 },
+cardTag: { fontSize: 12, lineHeight: 18, color: '#344766', fontWeight: '700', textTransform: 'uppercase', letterSpacing: .4 },
 heart: { position: 'absolute', right: 10, top: 7, color: '#716A62', fontSize: 21 },
-cardBody: { padding: 12 },
-productName: { color: '#102B62', fontSize: 15, fontWeight: '700', flexShrink: 1, minWidth: 0 },
-price: { color: '#946D25', fontWeight: '700', fontSize: 13, flexShrink: 1, width: '100%' },
-family: { color: '#8D867D', fontSize: 12, marginTop: 4 },
+cardBody: { padding: 12, paddingTop: 3, flex: 1 },
+productName: { color: '#102B62', fontSize: 20, lineHeight: 25, fontWeight: '700', marginTop: 2, fontFamily: Platform.OS === 'android' ? 'serif' : 'Georgia' },
+price: { color: '#A5771F', fontWeight: '700', fontSize: 17 },
+family: { color: '#697382', fontSize: 14, lineHeight: 21, marginTop: 4 },
 notes: { color: '#B1AAA1', fontSize: 11, marginTop: 6 },
-bottleWrapSmall: { height: 120 },
-productPhotoSmall: { width: 125, height: 116, borderRadius: 10 },
+bottleWrapSmall: { height: 152, width: '100%', paddingHorizontal: 8, justifyContent: 'center' },
+productPhotoSmall: { width: '100%', height: 150, borderRadius: 6 },
 capSmall: { width: 26, height: 23 },
 bottleSmall: { width: 52, height: 78, borderRadius: 6 },
 bottleMarkSmall: { fontSize: 20 },
-app: { flex: 1, width: '100%', maxWidth: 760, alignSelf: 'center', backgroundColor: '#FBF7EF' },
+app: { flex: 1, width: '100%', maxWidth: 760, alignSelf: 'center', backgroundColor: '#FBF9F5' },
 page: { padding: 24, paddingBottom: 110 },
 top: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 26 },
 eyebrow: { fontSize: 12, letterSpacing: 2, color: '#946D25', fontWeight: '700' },
@@ -575,10 +689,10 @@ orb: { width: 85, height: 85, borderRadius: 43, backgroundColor: '#BE936D', alig
 orbText: { color: '#FAE9CE', fontSize: 34 },
 intro: { color: '#766F67', lineHeight: 24, fontSize: 16, marginBottom: 20 },
 search: { fontSize: 28, color: '#7E756D' },
-filters: { gap: 8, paddingBottom: 25 },
-filter: { paddingVertical: 9, paddingHorizontal: 17, borderRadius: 18, borderWidth: 1, borderColor: '#E2DCD2' },
+filters: { gap: 7, paddingTop: 12, paddingBottom: 8 },
+filter: { minHeight: 38, justifyContent: 'center', paddingHorizontal: 13, borderRadius: 20, borderWidth: 1, borderColor: '#E3DDD2', backgroundColor: '#FFFFFF' },
 filterOn: { backgroundColor: '#102B62', borderColor: '#102B62' },
-filterText: { color: '#9B948B', fontSize: 14 },
+filterText: { color: '#657083', fontSize: 14 },
 filterTextOn: { color: '#F7EEE3', fontWeight: '700' },
 grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', gap: 12 },
 gridSingle: { justifyContent: 'flex-start' },
@@ -640,11 +754,11 @@ profileSub: { color: '#9C958C', marginTop: 7 },
 menu: { backgroundColor: '#FFFDF9', padding: 19, borderBottomWidth: 1, borderBottomColor: '#F0ECE6', flexDirection: 'row', justifyContent: 'space-between' },
 menuText: { color: '#4D4640', fontSize: 16 },
 chevron: { color: '#B4ACA2', fontSize: 22 },
-nav: { flexShrink: 0, minHeight: 76, backgroundColor: '#FFFCF7', borderTopWidth: 1, borderTopColor: '#EEE8DF', flexDirection: 'row', justifyContent: 'space-around', paddingTop: 11, paddingBottom: 8 },
-navItem: { alignItems: 'center', justifyContent: 'center', minWidth: 0, minHeight: 52, flex: 1, paddingHorizontal: 3 },
+nav: { flexShrink: 0, minHeight: 76, backgroundColor: '#FFFFFF', borderTopWidth: 1, borderTopColor: '#EAE6DE', flexDirection: 'row', justifyContent: 'space-around', paddingTop: 8, paddingBottom: 5 },
+navItem: { alignItems: 'center', justifyContent: 'center', minWidth: 0, minHeight: 60, flex: 1, paddingHorizontal: 2 },
 navIcon: { color: '#6E7785', fontSize: 22, height: 28 },
-navLabel: { color: '#5D6575', fontSize: 12, marginTop: 3, textAlign: 'center', flexShrink: 1 },
-navActive: { color: '#946D25', fontWeight: '700' },
+navLabel: { color: '#697382', fontSize: 12, marginTop: 4, textAlign: 'center', flexShrink: 1 },
+navActive: { color: '#102B62', fontWeight: '700' },
 pressed: { opacity: .78 },
 detail: { flex: 1, padding: 24, backgroundColor: '#FBF7EF' },
 back: { color: '#8F694A', fontSize: 16, marginBottom: 15 },
