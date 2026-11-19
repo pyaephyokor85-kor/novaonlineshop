@@ -6,7 +6,7 @@ import { prepareProfileImage } from './lib/profile-image.mjs';
 type Api = (path: string, method?: string, body?: any) => Promise<any>;
 const blank = (id: string): MediaRow => ({ id, kind: id.startsWith('NV-') ? 'product' : 'slide', title: '', description: '', image_url: null, enabled: true, deleted: false, cta: 'discover', sort_order: 0 });
 const field = { borderWidth: 1, borderColor: '#D7CDBE', borderRadius: 10, padding: 12, marginTop: 10, color: '#102B62', backgroundColor: '#FFFDF9' } as const;
-export default function AdminMedia({ api, onEditingChange, onBusyChange }: { api: Api; onEditingChange?: (editing: boolean) => void; onBusyChange?: (busy: boolean) => void }) {
+export default function AdminMedia({ api, mode, onEditingChange, onBusyChange }: { api: Api; mode: 'board' | 'products'; onEditingChange?: (editing: boolean) => void; onBusyChange?: (busy: boolean) => void }) {
   const [rows, setRows] = useState<MediaRow[]>([]);
   const [draft, setDraft] = useState<MediaRow | null>(null);
   const [busy, setBusy] = useState(false);
@@ -14,6 +14,8 @@ export default function AdminMedia({ api, onEditingChange, onBusyChange }: { api
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [scentText, setScentText] = useState('');
+  const [confirmScentDelete, setConfirmScentDelete] = useState(false);
   const editing = Boolean(draft);
   useEffect(() => { onEditingChange?.(editing); }, [editing, onEditingChange]);
   useEffect(() => { onBusyChange?.(busy); }, [busy, onBusyChange]);
@@ -25,7 +27,7 @@ export default function AdminMedia({ api, onEditingChange, onBusyChange }: { api
   };
   const load = useCallback(async () => { const data = await api('/api/admin/media'); setRows(data.media || []); }, [api]);
   useEffect(() => { let active = true; load().catch(e => { if (active) setError(e.message); }).finally(() => { if (active) setLoading(false); }); return () => { active = false; }; }, [load]);
-  const select = (row: MediaRow) => { if (draft && Platform.OS === 'web' && !window.confirm('မသိမ်းရသေးတဲ့ ပြင်ဆင်မှုတွေကို ပယ်ဖျက်ပြီး ဆက်သွားမလား။')) return; setDraft({ ...row }); setError(''); setNotice(''); setConfirmDelete(false); };
+  const select = (row: MediaRow) => { if (draft && Platform.OS === 'web' && !window.confirm('မသိမ်းရသေးတဲ့ ပြင်ဆင်မှုတွေကို ပယ်ဖျက်ပြီး ဆက်သွားမလား။')) return; setDraft({ ...row }); setScentText(row.scent_description ?? novaCatalog.find(p => p.id === row.id)?.bioMyanmar ?? ''); setConfirmScentDelete(false); setError(''); setNotice(''); setConfirmDelete(false); };
   const button = (label: string, onPress: () => void) => <Pressable accessibilityRole="button" disabled={busy || loading} onPress={onPress} style={{ minHeight: 44, justifyContent: 'center', padding: 10, borderRadius: 9, backgroundColor: '#102B62', marginTop: 8, opacity: busy || loading ? 0.5 : 1 }}><Text style={{ color: '#FFFDF9', fontWeight: '700' }}>{label}</Text></Pressable>;
   const upload = () => {
     if (!draft || Platform.OS !== 'web' || busy) return;
@@ -61,34 +63,57 @@ export default function AdminMedia({ api, onEditingChange, onBusyChange }: { api
     try {
       await api('/api/admin/media', 'POST', { ...draft, action: deleting ? 'delete' : 'save' });
       await load(); setDraft(null); setConfirmDelete(false);
-      setNotice(deleting ? 'Website မှာ ဒီပုံကို မပြတော့ပါ။' : 'သိမ်းပြီးပါပြီ။ Website မှာ စက္ကန့် ၃၀ အတွင်း ပြောင်းပါမယ်။');
+      setNotice(deleting ? 'Website မှာ ဒီပုံကို မပြတော့ပါ။ ရနံ့စာသားကို မဖျက်ပါ။' : 'သိမ်းပြီးပါပြီ။ Website မှာ စက္ကန့် ၃၀ အတွင်း ပြောင်းပါမယ်။');
     } catch (e: any) { setError(e.message); } finally { setBusy(false); }
   };
-  return <View style={{ paddingVertical: 12 }}><Text style={{ fontSize: 20, color: '#102B62', fontWeight: '700' }}>Slides & Product Photos</Text><Text style={{ color: '#746B60', marginTop: 8 }}>Slide ပုံများနှင့် NV code တစ်ခုချင်းစီရဲ့ ပုံကို ဒီနေရာမှာ ပြင်နိုင်ပါတယ်။ Upload လုပ်ပြီး Save နှိပ်ပါ။</Text>
+  const saveScent = async (clearing = false) => {
+    if (!draft || busy) return;
+    setBusy(true); setError(''); setNotice('');
+    try {
+      const data = await api('/api/admin/media', 'POST', { action: 'scent', id: draft.id, scent_description: clearing ? '' : scentText });
+      await load();
+      setDraft(old => old ? { ...old, scent_description: data.media.scent_description } : old);
+      setScentText(data.media.scent_description); setConfirmScentDelete(false);
+      setNotice(clearing ? 'ရနံ့အကြောင်းစာသား ဖျက်ပြီးပါပြီ။ ပုံကို မဖျက်ပါ။' : 'ရနံ့အကြောင်း သိမ်းပြီးပါပြီ။ Website မှာ စက္ကန့် ၃၀ အတွင်း ပြောင်းပါမယ်။');
+    } catch (e: any) { setError(e.message); } finally { setBusy(false); }
+  };
+  return <View style={{ paddingVertical: 12 }}><Text style={{ fontSize: 20, color: '#102B62', fontWeight: '700' }}>{mode === 'board' ? 'Home Live Board' : 'NV Profiles · ပုံနှင့် ရနံ့အကြောင်း'}</Text><Text style={{ color: '#746B60', marginTop: 8 }}>{mode === 'board' ? 'Home ရဲ့ Live Board တစ်နေရာတည်းမှာ ပုံအပြည့် ပြပါမယ်။ ပုံတစ်ပုံထက်ပိုရင် ယခင်ပုံ / နောက်ပုံ နဲ့ ရွေးကြည့်နိုင်ပါတယ်။' : 'NV code တစ်ခုချင်းစီရဲ့ ပုံနှင့် ရနံ့အကြောင်းကို သီးခြား သိမ်း၊ ပြင်၊ ဖျက်နိုင်ပါတယ်။'}</Text>
     {error ? <Text accessibilityRole="alert" style={{ color: '#9E3F35', padding: 12 }}>{error}</Text> : null}
     {notice ? <Text accessibilityRole="alert" style={{ color: '#355F3C', padding: 12 }}>{notice}</Text> : null}
     {loading ? <Text>ပုံစာရင်း ဖတ်နေပါတယ်…</Text> : null}
     {!draft ? <>
-      {button('+ Slide အသစ်', () => select(blank(`slide-${Date.now()}`)))}
+      {mode === 'board' ? <>
+      {button('+ Live Board ပုံအသစ်', () => select(blank(`slide-${Date.now()}`)))}
       {rows.filter(r => r.kind === 'slide' && !r.deleted).map(row => <View key={row.id} style={field}>{row.image_url ? <Image source={{ uri: row.image_url }} style={{ width: '100%', height: 130 }} resizeMode="contain" /> : null}<Text>{row.title} · {row.enabled ? 'Published' : 'Hidden'} · #{row.sort_order}</Text>{button('Edit / Delete', () => select(row))}</View>)}
-      <Text style={{ fontSize: 18, marginTop: 20, color: '#102B62' }}>Product Photos · NV-001–NV-032</Text>
+      </> : <>
+      <Text style={{ fontSize: 18, marginTop: 20, color: '#102B62' }}>NV-001–NV-032</Text>
       <Text style={{ fontSize: 15, lineHeight: 25, marginTop: 8, color: '#5D6575' }}>NV Profile ပုံ: JPG / PNG / WebP · မူလဖိုင် 20 MB အထိ။ Upload မတင်မီ အလိုအလျောက် 1 MB အောက် ချုံ့ပေးပါမယ်။ အကြံပြုဆိုဒ် 1080 × 1080 px (1:1)။ Pixel size သီးသန့်ကန့်သတ်ချက် မရှိပါ။ ပုလင်းနဲ့ စာသားကို အလယ်ပိုင်းမှာထားပြီး အနားပတ်လည် နေရာချန်ပါ။</Text>
-      {novaCatalog.map(product => { const row = rows.find(r => r.id === product.id); return <View key={product.id} style={field}><Text>{product.id} — {product.name}</Text><Text>{row?.deleted ? 'ပုံဖျက်ထားသည်' : row?.image_url ? 'သိမ်းထားသောပုံ' : 'မူလပုံ'}</Text>{button('ပုံတင် / ပြင် / ဖျက်', () => select(row || blank(product.id)))}</View>; })}
+      {novaCatalog.map(product => { const row = rows.find(r => r.id === product.id); return <View key={product.id} style={field}><Text>{product.id} — {product.name}</Text><Text>{row?.deleted ? 'ပုံဖျက်ထားသည်' : row?.image_url ? 'သိမ်းထားသောပုံ' : 'မူလပုံ'}</Text>{button('ပုံ / ရနံ့အကြောင်း ပြင်မယ်', () => select(row || blank(product.id)))}</View>; })}
+      </>}
     </> : <View style={field}>
       {button('← ပုံစာရင်းသို့ ပြန်မယ်', backToList)}
-      <Text style={{ fontWeight: '700' }}>{draft.id} · {draft.kind === 'product' ? novaCatalog.find(p => p.id === draft.id)?.name : 'Slide'}</Text>
+      <Text style={{ fontWeight: '700' }}>{draft.id} · {draft.kind === 'product' ? novaCatalog.find(p => p.id === draft.id)?.name : 'Live Board'}</Text>
+      {draft.kind === 'product' ? <View style={field}>
+        <Text style={{ fontSize: 18, fontWeight: '700', color: '#102B62' }}>ရနံ့အကြောင်း</Text>
+        <Text style={{ marginTop: 8, lineHeight: 24 }}>Code profile ထဲမှာ ပြမယ့်စာသားပါ။ စာသားပြင်တာနဲ့ ပုံပြင်တာကို သီးခြား Save နှိပ်ပါ။</Text>
+        <TextInput accessibilityLabel="Scent description" placeholder="ဒီရနံ့အကြောင်း ရေးပါ" multiline maxLength={4000} value={scentText} editable={!busy} onChangeText={value => { setScentText(value); setConfirmScentDelete(false); }} style={[field, { minHeight: 160, textAlignVertical: 'top', fontSize: 16, lineHeight: 26 }]} />
+        <Text>{scentText.length} / 4000</Text>
+        {button('ရနံ့စာသား သိမ်းမယ်', () => saveScent())}
+        {button(confirmScentDelete ? 'ရနံ့စာသား ဖျက်ရန် အတည်ပြုမယ်' : 'ရနံ့စာသား ဖျက်မယ်', () => confirmScentDelete ? saveScent(true) : setConfirmScentDelete(true))}
+      </View> : null}
       {draft.image_url ? <Image source={{ uri: draft.image_url }} style={{ width: '100%', height: 190 }} resizeMode="contain" /> : <Text style={{ marginTop: 12 }}>ပုံရွေးပေးပါ။</Text>}
       <Text style={{ fontSize: 15, lineHeight: 25, marginTop: 8, color: '#5D6575' }}>{draft.kind === 'product' ? 'Profile: မူလဖိုင် 20 MB အထိ · အချိုးထိန်းပြီး အရှည်ဆုံးဘက် 1080 px အထိ၊ ဖိုင် 1 MB အောက် ချုံ့တင်ပေးပါမယ်။' : 'Slide: JPG / PNG / WebP · 2 MB အထိ'}</Text>
       {button(busy ? 'ခဏစောင့်ပါ…' : 'Upload / Replace photo', upload)}
       {draft.kind === 'slide' ? <>
-        <TextInput accessibilityLabel="Slide title" placeholder="Slide ခေါင်းစဉ်" maxLength={90} value={draft.title} editable={!busy} onChangeText={title => setDraft({ ...draft, title })} style={field}/>
-        <TextInput accessibilityLabel="Slide description" placeholder="ရှင်းလင်းချက်" maxLength={500} multiline value={draft.description} editable={!busy} onChangeText={description => setDraft({ ...draft, description })} style={field}/>
-        <TextInput accessibilityLabel="Slide position" placeholder="အစဉ်နံပါတ်" keyboardType="number-pad" value={String(draft.sort_order)} editable={!busy} onChangeText={v => setDraft({ ...draft, sort_order: Number(v.replace(/\D/g, '')) || 0 })} style={field}/>
+        <Text style={{ marginTop: 10, lineHeight: 24 }}>ပုံအပြည့်ပြပါမယ်။ ခေါင်းစဉ်နဲ့ ရှင်းလင်းချက်ကို ပုံအပေါ် ထပ်မရေးပါ။ ပုံကိုနှိပ်ရင် ရွေးထားတဲ့ Collection / AI Agent သို့ သွားပါမယ်။</Text>
+        <TextInput accessibilityLabel="Board title" placeholder="Board ခေါင်းစဉ် (ပုံအတွက် ဖော်ပြချက်)" maxLength={90} value={draft.title} editable={!busy} onChangeText={title => setDraft({ ...draft, title })} style={field}/>
+        <TextInput accessibilityLabel="Board description" placeholder="ရှင်းလင်းချက်" maxLength={500} multiline value={draft.description} editable={!busy} onChangeText={description => setDraft({ ...draft, description })} style={field}/>
+        <TextInput accessibilityLabel="Board position" placeholder="အစဉ်နံပါတ်" keyboardType="number-pad" value={String(draft.sort_order)} editable={!busy} onChangeText={v => setDraft({ ...draft, sort_order: Number(v.replace(/\D/g, '')) || 0 })} style={field}/>
         {button(draft.cta === 'discover' ? 'CTA: Collection → AI Agent ပြောင်းမယ်' : 'CTA: AI Agent → Collection ပြောင်းမယ်', () => setDraft({ ...draft, cta: draft.cta === 'discover' ? 'advisor' : 'discover' }))}
       </> : null}
       {button(draft.enabled ? 'Published · ဖျောက်မယ်' : 'Hidden · ပြမယ်', () => setDraft({ ...draft, enabled: !draft.enabled }))}
-      {button('Save', () => save())}
-      {button(confirmDelete ? 'ဖျက်ရန် အတည်ပြုမယ်' : 'Delete', () => confirmDelete ? save(true) : setConfirmDelete(true))}
+      {button(draft.kind === 'slide' ? 'Save Live Board' : 'ပုံပြင်ဆင်မှု သိမ်းမယ်', () => save())}
+      {button(confirmDelete ? 'ပုံဖျက်ရန် အတည်ပြုမယ်' : 'ပုံဖျက်မယ်', () => confirmDelete ? save(true) : setConfirmDelete(true))}
       {button('Cancel / ပုံစာရင်းသို့ ပြန်မယ်', backToList)}
     </View>}
   </View>;

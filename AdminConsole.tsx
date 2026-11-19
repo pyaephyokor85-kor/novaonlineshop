@@ -9,7 +9,7 @@ import OrderSlip from './OrderSlip';
 import shopPricing from './data/shop-pricing.json';
 
 type Section = 'orders' | 'stock' | 'legacyStock' | 'daily' | 'discount' | 'showcase' | 'media';
-const sections: { id: Section; label: string }[] = [{ id: 'orders', label: 'Orders' }, { id: 'stock', label: 'Stock In / Out' }, { id: 'daily', label: 'နေ့စဉ်စာရင်း' }, { id: 'legacyStock', label: 'အဟောင်း / အရည် ml' }, { id: 'discount', label: 'Discount' }, { id: 'media', label: 'Photos / Slides' }, { id: 'showcase', label: 'Live Board' }];
+const sections: { id: Section; label: string }[] = [{ id: 'orders', label: 'Orders' }, { id: 'stock', label: 'Stock In / Out' }, { id: 'daily', label: 'နေ့စဉ်စာရင်း' }, { id: 'legacyStock', label: 'အဟောင်း / အရည် ml' }, { id: 'discount', label: 'Discount' }, { id: 'media', label: 'NV Profiles' }, { id: 'showcase', label: 'Live Board' }];
 
 const API_URL = (process.env.EXPO_PUBLIC_API_URL || '').replace(/\/$/, '');
 const endpoint = (path: string) => {
@@ -45,11 +45,6 @@ export default function AdminConsole({ onSignOut, authClient }: { onSignOut: () 
   const [mediaEditing, setMediaEditing] = useState(false);
   const [mediaBusy, setMediaBusy] = useState(false);
   const [stockBusy, setStockBusy] = useState(false);
-  const [showcaseTitle, setShowcaseTitle] = useState('');
-  const [showcaseDescription, setShowcaseDescription] = useState('');
-  const [showcaseImage, setShowcaseImage] = useState('');
-  const [showcaseCta, setShowcaseCta] = useState<'discover' | 'advisor'>('discover');
-  const [showcaseEnabled, setShowcaseEnabled] = useState(false);
   const [width, setWidth] = useState<80 | 110>(80);
   const [loading, setLoading] = useState(true);
   const [working, setWorking] = useState('');
@@ -73,11 +68,6 @@ export default function AdminConsole({ onSignOut, authClient }: { onSignOut: () 
     try {
       const [orderData, stockData, discountData] = await Promise.all([api('/api/admin/orders'), api('/api/admin/inventory'), api('/api/admin/discount')]);
       setOrders(orderData.orders || []);
-      try {
-        const showcase = await api('/api/admin/showcase');
-        const board = showcase.board;
-        if (board) { setShowcaseTitle(board.title || ''); setShowcaseDescription(board.description || ''); setShowcaseImage(board.image_url || ''); setShowcaseCta(board.cta || 'discover'); setShowcaseEnabled(Boolean(board.enabled)); }
-      } catch { /* Display board may not be initialized yet. */ }
       setInventory(stockData.inventory || []);
       setAdjustments(stockData.adjustments || []);
       const setting = discountData.setting || { enabled: false, percent: 0 };
@@ -89,7 +79,7 @@ export default function AdminConsole({ onSignOut, authClient }: { onSignOut: () 
 
   const canLeave = () => {
     if (working || mediaBusy || stockBusy) { setNotice('သိမ်းဆည်းနေပါတယ်။ ခဏစောင့်ပြီး ပြန်နှိပ်ပါ။'); return false; }
-    return !mediaEditing || Platform.OS !== 'web' || window.confirm('မသိမ်းရသေးတဲ့ ပုံပြင်ဆင်မှုတွေကို ပယ်ဖျက်ပြီး ထွက်မလား။');
+    return !mediaEditing || Platform.OS !== 'web' || window.confirm('မသိမ်းရသေးတဲ့ ပြင်ဆင်မှုတွေကို ပယ်ဖျက်ပြီး ထွက်မလား။');
   };
   const navigate = (next: Section, back = false) => {
     if (next === section || !canLeave()) return;
@@ -134,14 +124,6 @@ export default function AdminConsole({ onSignOut, authClient }: { onSignOut: () 
     catch (problem: any) { setError(problem?.message || 'Discount settings were not saved.'); }
     finally { setWorking(''); }
   };
-  const saveShowcase = async () => {
-    setWorking('showcase'); setError(''); setNotice('');
-    try {
-      await api('/api/admin/showcase', 'POST', { action: 'save', title: showcaseTitle, description: showcaseDescription, image_url: showcaseImage, cta: showcaseCta, enabled: showcaseEnabled });
-      setNotice('Live Showcase saved. Customer screens refresh within 30 seconds.');
-    } catch (problem: any) { setError(problem?.message || 'Could not save showcase.'); }
-    finally { setWorking(''); }
-  };
   const print = (order: Order, kind: 'receipt' | 'label') => {
     if (Platform.OS !== 'web' || typeof window === 'undefined') { setError('Printing is available in the web Preview.'); return; }
     const popup = window.open('', '_blank', 'width=600,height=800');
@@ -158,17 +140,7 @@ export default function AdminConsole({ onSignOut, authClient }: { onSignOut: () 
     {section === 'orders' ? <View style={styles.toolbar}><Text style={styles.help}>Paper size · 80 × 110 mm</Text></View> : null}
     {loading ? <Text style={styles.message}>Loading Preview data…</Text> : <ScrollView ref={contentScroll} contentContainerStyle={styles.content}>
       {error ? <Text accessibilityRole="alert" style={styles.error}>{error}</Text> : null}{notice ? <Text accessibilityLiveRegion="polite" style={styles.notice}>{notice}</Text> : null}
-      {section === 'showcase' ? <View style={{ gap: 12, backgroundColor: '#FFFFFF', borderRadius: 14, padding: 16 }}>
-        <Text style={styles.sectionTitle}>Home Live Display Board</Text>
-        <Text style={styles.help}>Publish updates to the Preview home screen (refreshes within 30 seconds).</Text>
-        <Text>Title</Text><TextInput style={{ borderWidth: 1, borderColor: '#DCD6CA', borderRadius: 9, padding: 11, color: '#102856' }} value={showcaseTitle} onChangeText={setShowcaseTitle} maxLength={90} placeholder="New at NOVA" />
-        <Text>Description</Text><TextInput style={{ borderWidth: 1, borderColor: '#DCD6CA', borderRadius: 9, padding: 11, color: '#102856' }} value={showcaseDescription} onChangeText={setShowcaseDescription} multiline maxLength={500} placeholder="Describe the collection" />
-        <Text>Image HTTPS URL (optional — use a real NOVA product photo)</Text><TextInput style={{ borderWidth: 1, borderColor: '#DCD6CA', borderRadius: 9, padding: 11, color: '#102856' }} value={showcaseImage} onChangeText={setShowcaseImage} autoCapitalize="none" placeholder="https://..." />
-        <View style={{ flexDirection: 'row', gap: 10, flexWrap: 'wrap' }}><PrintButton title={showcaseCta === 'discover' ? '✓ Explore Scents' : 'Explore Scents'} onPress={() => setShowcaseCta('discover')} /><PrintButton title={showcaseCta === 'advisor' ? '✓ Ask Adviser' : 'Ask Adviser'} onPress={() => setShowcaseCta('advisor')} /></View>
-        <View style={{ flexDirection: 'row', gap: 10 }}><PrintButton title={showcaseEnabled ? '✓ Published' : 'Publish board'} onPress={() => setShowcaseEnabled(true)} /><PrintButton title={!showcaseEnabled ? '✓ Hidden' : 'Hide board'} onPress={() => setShowcaseEnabled(false)} /></View>
-        <PrintButton title={working === 'showcase' ? 'Saving...' : 'Save Live Board'} disabled={working === 'showcase'} onPress={saveShowcase} />
-      </View> : null}
-      {section === 'media' ? <AdminMedia api={api} onEditingChange={setMediaEditing} onBusyChange={setMediaBusy} /> : section === 'orders' ? <>
+      {section === 'media' || section === 'showcase' ? <AdminMedia key={section} mode={section === 'showcase' ? 'board' : 'products'} api={api} onEditingChange={setMediaEditing} onBusyChange={setMediaBusy} /> : section === 'orders' ? <>
         <View style={styles.sectionHeading}><Text style={styles.sectionTitle}>Order queue</Text><Pressable onPress={refresh}><Text style={styles.refresh}>Refresh</Text></Pressable></View>
         <PrintButton title="နေ့စဉ်စာရင်းပိတ်ကြည့်ရန်" onPress={() => navigate('daily')} />
         <Text style={styles.helpBlock}>Print slip / PDF / PNG ကိုနှိပ်ပြီး slip ကြည့်နိုင်၊ ဖိုင်သိမ်းနိုင်ပါတယ်။ iPhone မှာ Share → Thermer ဖြင့် Bluetooth printer ဆီ ပို့ပါ။</Text>

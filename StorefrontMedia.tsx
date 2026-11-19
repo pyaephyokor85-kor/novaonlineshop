@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { Platform } from 'react-native';
-export type MediaRow = { id: string; kind: 'product' | 'slide'; title: string; description: string; image_url: string | null; enabled: boolean; deleted: boolean; cta: 'discover' | 'advisor'; sort_order: number };
+export type MediaRow = { id: string; kind: 'product' | 'slide'; title: string; description: string; scent_description?: string | null; image_url: string | null; enabled: boolean; deleted: boolean; cta: 'discover' | 'advisor'; sort_order: number };
 const Context = createContext<MediaRow[] | null>(null);
 export function StorefrontMediaProvider({ children }: { children: ReactNode }) {
   const [rows, setRows] = useState<MediaRow[] | null>(null);
