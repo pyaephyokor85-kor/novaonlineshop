@@ -10,6 +10,7 @@ import { StorefrontMediaProvider, useStorefrontMedia } from './StorefrontMedia';
 import { novaCatalog } from './data/nova-catalog';
 import shopPricing from './data/shop-pricing.json';
 import ShopIcon from './ShopIcon';
+import SampleCampaign, { SampleInvitation } from './SampleCampaign';
 import { FavoritesProvider, useFavorites } from './Favorites';
 import { storefrontCategory, filterStorefront } from './lib/storefront-discovery.mjs';
 type BottleSize = keyof typeof shopPricing.sizes;
@@ -224,7 +225,7 @@ function EmptyScents({ reset }: { reset: () => void }) {
   return <View style={s.emptyScents}><Text style={s.emptyTitle}>ရနံ့ မတွေ့သေးပါ</Text><Text style={s.emptyCopy}>Search နဲ့ Category ကို ပြောင်းရွေးပါ။ Saved စာရင်းအတွက် ရနံ့ပေါ်က Heart ကို နှိပ်ထားနိုင်ပါတယ်။</Text><Pressable accessibilityRole="button" onPress={reset} style={s.emptyReset}><Text style={s.emptyResetText}>ရနံ့အားလုံး ပြန်ကြည့်မယ်</Text></Pressable></View>;
 }
 type CollectionState = { query: string; category: string; savedOnly: boolean };
-function Home({ go, pick, collection, setCollection, ask }: { go: (t: Tab) => void; pick: (p: Product) => void; collection: CollectionState; setCollection: (state: CollectionState) => void; ask: (prompt: string) => void }) {
+function Home({ go, pick, collection, setCollection, ask, onApply }: { go: (t: Tab) => void; pick: (p: Product) => void; collection: CollectionState; setCollection: (state: CollectionState) => void; ask: (prompt: string) => void; onApply: () => void }) {
   const { width, fontScale } = useWindowDimensions();
   const stack = width < 360 || fontScale > 1.2;
   const favorites = useFavorites();
@@ -250,6 +251,7 @@ function Home({ go, pick, collection, setCollection, ask }: { go: (t: Tab) => vo
         </View>
         <Pressable accessibilityRole="button" accessibilityLabel="Ask NOVA AI Agent" onPress={() => ask('')} style={s.adviserCta}><Text style={s.adviserCtaText}>Ask NOVA</Text></Pressable>
       </View>
+      <SampleInvitation onPress={onApply} />
       <View style={s.sectionHead}><Text style={s.sectionTitle}>Discover Scents</Text><Pressable accessibilityRole="button" accessibilityLabel="Show saved scents" accessibilityState={{ selected: collection.savedOnly }} onPress={() => setCollection({ ...collection, savedOnly: !collection.savedOnly })} style={[s.savedFilter, collection.savedOnly && s.savedFilterActive]}><ShopIcon name="heart" size={16} color="#A97A23" filled={collection.savedOnly} /><Text style={s.savedFilterText}>{favorites.ids.length}</Text></Pressable></View>
       <CategoryTabs value={collection.category} onChange={category => setCollection({ ...collection, category })} />
       {favorites.error ? <Text accessibilityRole="alert" style={s.storeNotice}>{favorites.error}</Text> : null}
@@ -372,6 +374,9 @@ function Advisor({ pick, initialPrompt = '' }: { pick: (p: Product) => void; ini
   };
   return <SafeAreaView style={s.advisor}><View style={s.advisorHead}><View style={s.agentHeaderIdentity}><LivingNovaAgent size={48} thinking={loading} /><View><Text style={s.eyebrow}>NOVA INTELLIGENCE</Text><Text style={s.heading}>NOVA AI Agent</Text></View></View><Text style={s.online}>{loading ? 'THINKING…' : 'NOVA AI'}</Text></View><ScrollView contentContainerStyle={s.chat}><ProfileMemory profile={profile} />{messages.map(m => <View key={m.id} style={m.from === 'nova' ? s.agentMessageRow : s.customerMessageRow}>{m.from === 'nova' ? <Image source={require('./assets/nova-ai-robot.jpg')} style={s.agentAvatar} resizeMode="contain" accessibilityLabel="NOVA AI Agent" /> : null}<View style={[s.bubble, m.from === 'user' && s.userBubble, m.from === 'nova' && s.agentSpeechBubble]}><Text style={[s.bubbleText, m.from === 'user' && s.userText]}>{m.text}</Text>{m.recommendations?.length ? <RecommendationStrip items={m.recommendations} pick={pick} /> : null}</View></View>)}{loading && <View style={s.bubble}><Text style={s.bubbleText}>Learning your preferences…</Text></View>}</ScrollView><View style={s.composer}><TextInput value={input} onChangeText={setInput} accessibilityLabel="Message NOVA AI Agent" placeholder="ရနံ့အကြောင်း မေးလိုက်ပါ…" placeholderTextColor="#9C968D" style={s.input} onSubmitEditing={send} returnKeyType="send" editable={!loading}/><Pressable accessibilityRole="button" accessibilityLabel="Send message" disabled={loading || !input.trim() || !profileId} onPress={send} style={s.send}><Text style={s.sendText}>↑</Text></Pressable></View></SafeAreaView>;
 }
+function AdminAccess() {
+  return Platform.OS === 'web' ? <Pressable accessibilityRole="button" accessibilityLabel="Admin and staff login" onPress={() => window.location.assign('/admin')} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 56, padding: 16, borderRadius: 12, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E6DFD3', marginVertical: 18 }}><ShopIcon name="lock" size={22} /><View><Text style={{ color: '#102B62', fontSize: 16, fontWeight: '700' }}>Admin / Staff</Text><Text style={{ color: '#647084', fontSize: 14, marginTop: 3 }}>ဆိုင်စီမံခန့်ခွဲရန် ဝင်မယ်</Text></View></Pressable> : null;
+}
 function Profile({ onSignOut }: { onSignOut: () => void }) {
   const [profile, setProfile] = useState<FragranceProfile>(emptyProfile);
   const [supportOpen, setSupportOpen] = useState(false);
@@ -406,6 +411,7 @@ function Profile({ onSignOut }: { onSignOut: () => void }) {
       </Pressable>
       {supportError ? <Text accessibilityRole="alert" style={s.profileSub}>{supportError}</Text> : null}
     </>}
+    <AdminAccess />
     <Pressable onPress={onSignOut} style={s.menu}><Text style={[s.menuText, { color: '#A35F4B' }]}>↪  Sign out</Text><Text style={s.chevron}>›</Text></Pressable></ScrollView>;
 }
 function AuthScreen({ onAuth }: { onAuth: (session: string) => void }) {
@@ -435,7 +441,7 @@ function AuthScreen({ onAuth }: { onAuth: (session: string) => void }) {
     try { const identity = await getProfileId(); await AsyncStorage.setItem('@nova/local-session', identity); onAuth(identity); }
     catch { setError('Unable to save your guest session. Please try again.'); }
   };
-  return <SafeAreaView className="flex-1 bg-nova-cream"><ScrollView contentContainerClassName="items-center px-7 pb-12 pt-14" showsVerticalScrollIndicator={false}><View className="h-16 w-16 items-center justify-center rounded-full bg-nova-ink shadow-lg"><Text className="text-3xl font-bold text-nova-gold">N</Text></View><Text className="mt-4 text-lg font-bold tracking-[6px] text-nova-ink">NOVA</Text><Text className="mt-2 text-center text-[15px] text-nova-clay">A more personal way to wear fragrance.</Text><View className="mt-9 w-full rounded-[24px] border border-[#EFE7DD] bg-nova-paper p-6 shadow-xl"><Text className="text-[25px] font-semibold text-nova-ink">{mode === 'login' ? 'Welcome back.' : 'Create your scent space.'}</Text><Text className="mt-2 text-sm leading-5 text-nova-muted">{mode === 'login' ? 'Continue your fragrance journey.' : 'Your preferences will shape every recommendation.'}</Text><TextInput value={email} onChangeText={setEmail} placeholder="Email address" placeholderTextColor="#A39A91" keyboardType="email-address" autoCapitalize="none" className="mt-5 rounded-xl bg-[#F3EEE7] px-4 py-3.5 text-[15px] text-nova-ink"/><TextInput value={password} onChangeText={setPassword} placeholder="Password" placeholderTextColor="#A39A91" secureTextEntry className="mt-2 rounded-xl bg-[#F3EEE7] px-4 py-3.5 text-[15px] text-nova-ink"/><Pressable onPress={submit} disabled={submitting} className="mt-4 items-center rounded-xl bg-nova-ink py-4 active:opacity-80"><Text className="text-[15px] font-bold text-[#F7EEE3]">{submitting ? 'Please wait…' : mode === 'login' ? 'Log in  →' : 'Create account  →'}</Text></Pressable><View className="mt-5 flex-row justify-center"><Text className="text-sm text-nova-muted">{mode === 'login' ? 'New to NOVA?' : 'Already have an account?'}</Text><Pressable onPress={() => setMode(mode === 'login' ? 'signup' : 'login')}><Text className="text-sm font-bold text-nova-clay">{mode === 'login' ? ' Create account' : ' Log in'}</Text></Pressable></View></View>{error ? <Text className="mt-4 text-center text-[13px] leading-4 text-[#A35F4B]">{error}</Text> : null}<Pressable onPress={continueGuest}><Text className="mt-6 text-[15px] font-bold text-nova-clay">Continue as guest for now</Text></Pressable><Text className="mt-3 text-center text-[12px] text-[#B3ABA2]">Guest preferences stay on this device. Signed-in profiles sync when configured.</Text></ScrollView></SafeAreaView>;
+  return <SafeAreaView className="flex-1 bg-nova-cream"><ScrollView contentContainerClassName="items-center px-7 pb-12 pt-14" showsVerticalScrollIndicator={false}><View className="h-16 w-16 items-center justify-center rounded-full bg-nova-ink shadow-lg"><Text className="text-3xl font-bold text-nova-gold">N</Text></View><Text className="mt-4 text-lg font-bold tracking-[6px] text-nova-ink">NOVA</Text><Text className="mt-2 text-center text-[15px] text-nova-clay">A more personal way to wear fragrance.</Text><View className="mt-9 w-full rounded-[24px] border border-[#EFE7DD] bg-nova-paper p-6 shadow-xl"><Text className="text-[25px] font-semibold text-nova-ink">{mode === 'login' ? 'Welcome back.' : 'Create your scent space.'}</Text><Text className="mt-2 text-sm leading-5 text-nova-muted">{mode === 'login' ? 'Continue your fragrance journey.' : 'Your preferences will shape every recommendation.'}</Text><TextInput value={email} onChangeText={setEmail} placeholder="Email address" placeholderTextColor="#A39A91" keyboardType="email-address" autoCapitalize="none" className="mt-5 rounded-xl bg-[#F3EEE7] px-4 py-3.5 text-[15px] text-nova-ink"/><TextInput value={password} onChangeText={setPassword} placeholder="Password" placeholderTextColor="#A39A91" secureTextEntry className="mt-2 rounded-xl bg-[#F3EEE7] px-4 py-3.5 text-[15px] text-nova-ink"/><Pressable onPress={submit} disabled={submitting} className="mt-4 items-center rounded-xl bg-nova-ink py-4 active:opacity-80"><Text className="text-[15px] font-bold text-[#F7EEE3]">{submitting ? 'Please wait…' : mode === 'login' ? 'Log in  →' : 'Create account  →'}</Text></Pressable><View className="mt-5 flex-row justify-center"><Text className="text-sm text-nova-muted">{mode === 'login' ? 'New to NOVA?' : 'Already have an account?'}</Text><Pressable onPress={() => setMode(mode === 'login' ? 'signup' : 'login')}><Text className="text-sm font-bold text-nova-clay">{mode === 'login' ? ' Create account' : ' Log in'}</Text></Pressable></View></View>{error ? <Text className="mt-4 text-center text-[13px] leading-4 text-[#A35F4B]">{error}</Text> : null}<Pressable onPress={continueGuest}><Text className="mt-6 text-[15px] font-bold text-nova-clay">Continue as guest for now</Text></Pressable><Text className="mt-3 text-center text-[12px] text-[#B3ABA2]">Guest preferences stay on this device. Signed-in profiles sync when configured.</Text><AdminAccess /></ScrollView></SafeAreaView>;
 }
 function Detail({ p, close }: { p: Product; close: () => void }) {
   const media = useStorefrontMedia();
@@ -520,6 +526,7 @@ function StorefrontApp() {
   const [tab, setTab] = useState<Tab>('home');
   const [collection, setCollection] = useState<CollectionState>({ query: '', category: 'All', savedOnly: false });
   const [advisorPrompt, setAdvisorPrompt] = useState('');
+  const [samplesOpen, setSamplesOpen] = useState(false);
   const ask = (prompt: string) => { setAdvisorPrompt(prompt); setTab('advisor'); };
   const navigate = (next: Tab) => { if (next === 'advisor') setAdvisorPrompt(''); setTab(next); };
   const [selected, setSelected] = useState<Product | null>(null);
@@ -542,14 +549,14 @@ function StorefrontApp() {
     return () => { active = false; subscription?.unsubscribe(); };
   }, []);
   if (booting) return <SafeAreaView style={s.auth}><StatusBar style="dark" /></SafeAreaView>;
-  const screen = tab === 'home' ? <Home go={navigate} pick={setSelected} collection={collection} setCollection={setCollection} ask={ask} />
+  const screen = tab === 'home' ? <Home go={navigate} pick={setSelected} collection={collection} setCollection={setCollection} ask={ask} onApply={() => setSamplesOpen(true)} />
     : tab === 'discover' ? <Discover pick={setSelected} collection={collection} setCollection={setCollection} />
     : tab === 'advisor' ? <Advisor pick={setSelected} initialPrompt={advisorPrompt} />
     : !session ? <AuthScreen onAuth={setSession} /> : <Profile onSignOut={async () => { if (supabase) await supabase.auth.signOut(); await AsyncStorage.removeItem('@nova/local-session'); setTab('home'); setSelected(null); setSession(null); }} />;
   return <SafeAreaView style={s.app}><StatusBar style={tab === 'home' ? 'light' : 'dark'} />{screen}
     <View style={s.nav}>{([['home', 'home', 'Home'], ['discover', 'search', 'Discover'], ['advisor', null, 'AI Agent'], ['profile', 'profile', 'Profile']] as const).map(([key, icon, label]) => <Pressable key={key} accessibilityRole="button" accessibilityLabel={label} accessibilityState={{ selected: tab === key }} onPress={() => navigate(key)} style={s.navItem}>{icon ? <ShopIcon name={icon} size={24} color={tab === key ? '#102B62' : '#6B7280'} filled={key === 'home' && tab === key} /> : <LivingNovaAgent size={28} compact />}<Text style={[s.navLabel, tab === key && s.navActive]}>{label}</Text><View style={[s.navIndicator, tab === key && s.navIndicatorActive]} /></Pressable>)}
-      {Platform.OS === 'web' ? <Pressable accessibilityRole="button" accessibilityLabel="Admin and staff login" onPress={() => window.location.assign('/admin')} style={s.navItem}><ShopIcon name="lock" size={23} color="#6B7280" /><Text style={s.navLabel}>Admin / Staff</Text><View style={s.navIndicator} /></Pressable> : null}
     </View>
+    <Modal visible={samplesOpen} animationType="slide" onRequestClose={() => {}}>{samplesOpen ? <SampleCampaign close={() => setSamplesOpen(false)} /> : null}</Modal>
     <Modal visible={Boolean(selected)} animationType="slide" onRequestClose={() => {}}>{selected ? <Detail key={selected.id} p={selected} close={() => setSelected(null)} /> : null}</Modal>
   </SafeAreaView>;
 }

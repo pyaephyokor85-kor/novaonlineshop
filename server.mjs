@@ -93,9 +93,10 @@ const server = http.createServer(async (req, res) => {
       return printJson(res, result.status, result.body);
     } catch (error) { return printJson(res, error.statusCode || 400, { error: error.message || 'Preview print request failed.' }); }
   }
-  if (req.method === 'GET' && ['/api/storefront-media', '/api/showcase'].includes(req.url)) {
+  if (printPath === '/api/storefront-media' || (req.method === 'GET' && printPath === '/api/showcase')) {
+    if (req.method === 'POST') { try { req.body = await readBody(req); } catch { return json(res, 400, { error: 'Invalid request' }); } }
     const response = { setHeader: (k,v) => res.setHeader(k,v), status: code => ({ json: body => json(res, code, body) }) };
-    return (req.url === '/api/storefront-media' ? publicMediaHandler : showcaseHandler)(req, response);
+    return (printPath === '/api/storefront-media' ? publicMediaHandler : showcaseHandler)(req, response);
   }
   if (req.method === 'OPTIONS') return json(res, 204, {});
   if (req.method === 'GET' && req.url === '/health') return json(res, 200, { ok: true, provider, model, memory: 'file-backed', supabase: Boolean(supabaseUrl && supabaseKey), catalogSize: catalogProducts.length });
