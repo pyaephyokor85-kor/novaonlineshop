@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Image, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { novaCatalog } from './data/nova-catalog';
 import type { MediaRow } from './StorefrontMedia';
-import { prepareProfileImage } from './lib/profile-image.mjs';
+import { prepareProfileImage, prepareBoardImage } from './lib/profile-image.mjs';
 type Api = (path: string, method?: string, body?: any) => Promise<any>;
 const blank = (id: string): MediaRow => ({ id, kind: id.startsWith('NV-') ? 'product' : 'slide', title: '', description: '', image_url: null, enabled: true, deleted: false, cta: 'discover', sort_order: 0 });
 const field = { borderWidth: 1, borderColor: '#D7CDBE', borderRadius: 10, padding: 12, marginTop: 10, color: '#102B62', backgroundColor: '#FFFDF9' } as const;
@@ -37,8 +37,8 @@ export default function AdminMedia({ api, mode, onEditingChange, onBusyChange }:
       const file = input.files?.[0]; if (!file) return;
       setError(''); setNotice('');
       const isProfile = id.startsWith('NV-');
-      const inputLimit = (isProfile ? 20 : 2) * 1024 * 1024;
-      if (file.size > inputLimit) { setError(isProfile ? '20 MB အောက်ပုံ ရွေးပေးပါ။ Profile ပုံကို upload မတင်မီ အလိုအလျောက် ချုံ့ပေးပါမယ်။' : 'Slide ပုံကို 2 MB အောက် ရွေးပေးပါ။'); return; }
+      const inputLimit = 20 * 1024 * 1024;
+      if (file.size > inputLimit) { setError('20 MB အောက်ပုံ ရွေးပေးပါ။ Upload မတင်မီ အလိုအလျောက် ချုံ့ပေးပါမယ်။'); return; }
       setBusy(true);
       try {
         // iPhone Files can return an empty or generic MIME type for valid images.
@@ -50,7 +50,7 @@ export default function AdminMedia({ api, mode, onEditingChange, onBusyChange }:
           : bytes[0] === 82 && bytes[1] === 73 && bytes[2] === 70 && bytes[3] === 70 && bytes[8] === 87 && bytes[9] === 69 && bytes[10] === 66 && bytes[11] === 80 ? 'image/webp' : '';
         if (!mime) throw new Error('ဒီဖိုင်က PNG / JPEG / WebP ပုံ မဟုတ်ပါ။ HEIC ပုံဆိုရင် JPEG အဖြစ် ပြောင်းပြီး ရွေးပေးပါ။');
         let imageFile: Blob = new Blob([bytes], { type: mime });
-        if (isProfile) imageFile = (await prepareProfileImage(imageFile)).blob;
+        imageFile = (await (isProfile ? prepareProfileImage(imageFile) : prepareBoardImage(imageFile))).blob;
         const dataUrl = await new Promise<string>((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(String(reader.result)); reader.onerror = () => reject(new Error('ဖိုင်ဖတ်မရပါ။')); reader.readAsDataURL(imageFile); });
         const data = await api('/api/admin/media', 'POST', { action: 'upload', id, dataUrl });
         setDraft(old => old?.id === id ? { ...old, image_url: data.image_url, deleted: false } : old);
@@ -102,7 +102,7 @@ export default function AdminMedia({ api, mode, onEditingChange, onBusyChange }:
         {button(confirmScentDelete ? 'ရနံ့စာသား ဖျက်ရန် အတည်ပြုမယ်' : 'ရနံ့စာသား ဖျက်မယ်', () => confirmScentDelete ? saveScent(true) : setConfirmScentDelete(true))}
       </View> : null}
       {draft.image_url ? <Image source={{ uri: draft.image_url }} style={{ width: '100%', height: 190 }} resizeMode="contain" /> : <Text style={{ marginTop: 12 }}>ပုံရွေးပေးပါ။</Text>}
-      <Text style={{ fontSize: 15, lineHeight: 25, marginTop: 8, color: '#5D6575' }}>{draft.kind === 'product' ? 'Profile: မူလဖိုင် 20 MB အထိ · အချိုးထိန်းပြီး အရှည်ဆုံးဘက် 1080 px အထိ၊ ဖိုင် 1 MB အောက် ချုံ့တင်ပေးပါမယ်။' : 'Slide: JPG / PNG / WebP · 2 MB အထိ'}</Text>
+      <Text style={{ fontSize: 15, lineHeight: 25, marginTop: 8, color: '#5D6575' }}>{draft.kind === 'product' ? 'Profile: မူလဖိုင် 20 MB အထိ · အချိုးထိန်းပြီး အရှည်ဆုံးဘက် 1080 px အထိ၊ ဖိုင် 1 MB အောက် ချုံ့တင်ပေးပါမယ်။' : 'Live Board: JPG / PNG / WebP · မူလဖိုင် 20 MB အထိ။ အချိုးထိန်းပြီး အရှည်ဆုံးဘက် 1920 px အထိ၊ ဖိုင် 2 MB အောက် Auto ချုံ့တင်ပေးပါမယ်။'}</Text>
       {button(busy ? 'ခဏစောင့်ပါ…' : 'Upload / Replace photo', upload)}
       {draft.kind === 'slide' ? <>
         <Text style={{ marginTop: 10, lineHeight: 24 }}>ပုံအပြည့်ပြပါမယ်။ ခေါင်းစဉ်နဲ့ ရှင်းလင်းချက်ကို ပုံအပေါ် ထပ်မရေးပါ။ ပုံကိုနှိပ်ရင် ရွေးထားတဲ့ Collection / AI Agent သို့ သွားပါမယ်။</Text>
