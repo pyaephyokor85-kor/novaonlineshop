@@ -21,6 +21,7 @@ export default function AdminFormulaLab() {
   const [saved, setSaved] = useState<{ id: string; created: string; draft: Draft }[]>([]);
   const [message, setMessage] = useState('');
   const [ready, setReady] = useState(false);
+  const [step, setStep] = useState<'formula' | 'materials' | 'packaging' | 'sales' | 'results'>('formula');
   const set = (key: keyof Draft, value: string) => setDraft(old => ({ ...old, [key]: value }));
   useEffect(() => {
     AsyncStorage.getItem(KEY).then(data => {
@@ -60,6 +61,9 @@ export default function AdminFormulaLab() {
   return <View style={s.root}>
     <Text style={s.title}>NOVA · Formula & Profit Lab</Text>
     <Text style={s.help}>Private planning tool. Cost inputs in Ks; ingredient rates in Ks per ml. Calculations use nominal volume, not density-corrected weights. Formula records stay on this device and are NOT synced to Supabase.</Text>
+    <Text style={s.label}>Choose section (tap to switch)</Text>
+    <View style={s.chips}>{([{ id: 'formula', label: '1 · Formula' }, { id: 'materials', label: '2 · Oils Cost' }, { id: 'packaging', label: '3 · Packaging' }, { id: 'sales', label: '4 · Selling' }, { id: 'results', label: '5 · Profit' }] as const).map(item => <Pressable accessibilityRole="button" key={item.id} onPress={() => setStep(item.id)} style={[s.chip, step === item.id && s.chipOn]}><Text style={[s.chipText, step === item.id && s.chipTextOn]}>{item.label}</Text></Pressable>)}</View>
+    {step === 'formula' ? <>
     <Text style={s.subtitle}>1. Scent & bottle size</Text>
     <View style={s.chips}>{novaCatalog.map(item => <Pressable key={item.id} onPress={() => set('scent', item.id)} style={[s.chip, draft.scent === item.id && s.chipOn]}><Text style={[s.chipText, draft.scent === item.id && s.chipTextOn]}>{item.id}</Text></Pressable>)}</View>
     <View style={s.chips}>{['10', '15', '30', '50', '100'].map(size => <Pressable key={size} onPress={() => changeSize(size)} style={[s.chip, draft.size === size && s.chipOn]}><Text style={[s.chipText, draft.size === size && s.chipTextOn]}>{size} ml</Text></Pressable>)}</View>
@@ -72,6 +76,8 @@ export default function AdminFormulaLab() {
     </View>
     <Metric label="Ethanol (auto balance)" value={calculation ? fmt(calculation.alcoholPct) + '%' : 'Invalid formula'} />
     {calculation ? <Text style={s.help}>Per bottle: Oil {fmt(calculation.oilMl)} ml + Ethanol {fmt(calculation.alcoholMl)} ml + Water {fmt(calculation.waterMl)} ml + Fixative {fmt(calculation.fixMl)} ml = {draft.size} ml</Text> : <Text style={s.error}>All percentages must total 100% or less, and quantities/costs must be valid non-negative numbers.</Text>}
+    </> : null}
+    {step === 'materials' ? <>
     <Text style={s.subtitle}>3. Ingredients purchase cost</Text>
     <View style={s.columns}>
       <Input label="Oil cost" suffix="Ks/ml" value={draft.oilRate} onChange={v => set('oilRate', v)} />
@@ -79,6 +85,8 @@ export default function AdminFormulaLab() {
       <Input label="Water cost" suffix="Ks/ml" value={draft.waterRate} onChange={v => set('waterRate', v)} />
       <Input label="Fixative cost" suffix="Ks/ml" value={draft.fixRate} onChange={v => set('fixRate', v)} />
     </View>
+    </> : null}
+    {step === 'packaging' ? <>
     <Text style={s.subtitle}>4. Packaging & manufacturing (Ks per bottle)</Text>
     <View style={s.columns}>
       <Input label="Bottle / Atomizer" value={draft.bottle} onChange={v => set('bottle', v)} />
@@ -87,6 +95,8 @@ export default function AdminFormulaLab() {
       <Input label="Labor" value={draft.labor} onChange={v => set('labor', v)} />
       <Input label="Overhead / Wastage" value={draft.overhead} onChange={v => set('overhead', v)} />
     </View>
+    </> : null}
+    {step === 'sales' ? <>
     <Text style={s.subtitle}>5. Selling cost & price</Text>
     <View style={s.columns}>
       <Input label="Retail price" suffix="Ks" value={draft.price} onChange={v => set('price', v)} />
@@ -95,6 +105,8 @@ export default function AdminFormulaLab() {
       <Input label="Shipping paid by shop" suffix="Ks/bottle" value={draft.shipping} onChange={v => set('shipping', v)} />
       <Input label="Platform/payment fee" suffix="%" value={draft.fee} onChange={v => set('fee', v)} />
     </View>
+    </> : null}
+    {step === 'results' ? <>
     {calculation ? <View style={s.result}>
       <Text style={s.resultTitle}>LIVE PROFIT BREAKDOWN</Text>
       <Metric label="Ingredients / bottle" value={currency(calculation.raw)} />
@@ -120,6 +132,8 @@ export default function AdminFormulaLab() {
         <Pressable onPress={() => remove(entry.id)} style={s.chip}><Text style={s.chipText}>Delete</Text></Pressable>
       </View>
     </View>) : <Text style={s.help}>No formula saved yet.</Text>}
+    </> : null}
+    <Text style={s.help}>Tip: use the numbered section buttons above to reach all inputs. Saving is available in the 5 · Profit section.</Text>
     <Text style={s.help}>Safety: Verify IFRA Category 4 maximum concentration for each fragrance and relevant SDS before skin tests or production. This tool is not an IFRA safety certification. Customer prices and stock are not changed by this calculator.</Text>
   </View>;
 }
@@ -130,7 +144,7 @@ const s = StyleSheet.create({
  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 10 },
  chip: { paddingHorizontal: 11, paddingVertical: 9, borderRadius: 9, backgroundColor: '#F2E9D8', borderWidth: 1, borderColor: '#D8C7AC' },
  chipOn: { backgroundColor: '#102B62', borderColor: '#102B62' }, chipText: { color: '#102B62', fontWeight: '700', fontSize: 12 }, chipTextOn: { color: '#FFFFFF' },
- columns: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 }, field: { flexGrow: 1, minWidth: 135, flexBasis: '45%', marginBottom: 7 },
+ columns: { flexDirection: 'column', gap: 10, width: '100%' }, field: { width: '100%', marginBottom: 7 },
  label: { color: '#453F38', fontWeight: '700', fontSize: 13, marginBottom: 5 },
  input: { backgroundColor: '#FFFFFF', color: '#102B62', borderColor: '#D9CDBD', borderWidth: 1, borderRadius: 9, paddingHorizontal: 11, paddingVertical: 11, fontSize: 15 },
  metric: { flexDirection: 'row', justifyContent: 'space-between', gap: 8, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#E7DBCA' },
