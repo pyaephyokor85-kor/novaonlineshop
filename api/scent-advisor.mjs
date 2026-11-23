@@ -109,6 +109,12 @@ function normalizeConversation(history) {
     .filter(item => item.content).slice(-MAX_CONVERSATION_ITEMS);
 }
 
+const occasions = [
+  { pattern: /ပါတီ|ပွဲတက်|ညပွဲ|\bparty\b/iu, families: ['amber', 'sweet', 'gourmand'], intro: 'ပါတီသွားဖို့ဆို နွေးနွေးလေးနဲ့ ရနံ့ပေါ်လွင်တဲ့ဘက်က ရွေးပေးချင်တယ်။' },
+  { pattern: /ရုံး|အလုပ်တက်|\b(?:office|work)\b/iu, families: ['fresh', 'aquatic', 'citrus'], intro: 'ရုံးမှာ နေ့တိုင်းသုံးဖို့ဆို လတ်ဆတ်တဲ့ဘက်က ရွေးပေးချင်တယ်။' },
+];
+const currentOccasion = message => occasions.find(item => item.pattern.test(message));
+
 function rankCatalog(inputProfile, purchases = [], message = '') {
   const profile = safeProfile(inputProfile);
   const season = seasonContext();
@@ -120,6 +126,7 @@ function rankCatalog(inputProfile, purchases = [], message = '') {
   // A mistyped SKU must not silently recommend an unrelated product.
   if (requested.unknownSkus.length && !requested.ids.length) return [];
   const query = fold(message);
+  const occasion = currentOccasion(message);
   const queryTerms = [...new Set(query.match(/[a-z][a-z0-9]{2,}/g) || [])]
     .filter(term => !['the', 'and', 'for', 'with', 'want', 'like', 'perfume', 'recommend', 'please', 'about', 'tell'].includes(term));
   return catalog.map(product => {
@@ -133,7 +140,7 @@ function rankCatalog(inputProfile, purchases = [], message = '') {
     const directMatch = requested.ids.includes(product.id);
     const lexicalMatches = queryTerms.filter(term => includesTerm(text, term)).length;
     // Explicit product lookups and current preferences outweigh the weak seasonal tie-breaker.
-    const score = (directMatch ? 1000 : 0) + matchedFamilies.length * 4 + matchedNotes.length * 3 + descriptionMatches.length * 8 + lexicalMatches * 2 + seasonalMatches.length + historyMatches.length * 2;
+    const score = (directMatch ? 1000 : 0) + matchedFamilies.length * 4 + matchedNotes.length * 3 + descriptionMatches.length * 8 + (occasion ? product.family.filter(tag => occasion.families.includes(tag)).length * 12 : 0) + lexicalMatches * 2 + seasonalMatches.length + historyMatches.length * 2;
     return { ...product, score, matchedFamilies, matchedNotes, seasonalMatches, purchaseMatches: history.filter(x => String(x.productId || x.product_id) === product.id).length, blocked };
   }).filter(product => !product.blocked).sort((a, b) => b.score - a.score || a.id.localeCompare(b.id));
 }
@@ -162,10 +169,12 @@ function fallbackReply(message, recommendations) {
       : 'No catalog match remains after your dislikes. Tell me another scent preference or product name.';
   }
   // Keep fallback concise; prices and payment details are visible elsewhere in the storefront.
-  return recommendations.map(product => {
+  const intro = isBurmese(message) && currentOccasion(message)?.intro;
+  const descriptions = recommendations.map(product => {
     const description = product.bioMyanmar || product.familyLabel || product.family.join(', ');
     return `${product.id} — ${product.name}: ${description}`;
   }).join('\n\n');
+  return intro ? intro + '\n\n' + descriptions : descriptions;
 }
 
 function catalogFacts(product) {
@@ -220,6 +229,16 @@ export default async function handler(req, res) {
     let recommendations = candidates.slice(0, limit);
     const season = seasonContext();
     let reply = fallbackReply(message, recommendations);
+    // Without an identifiable preference, ask for context instead of recycling seasonal cards.
+    const explicit = lookup(message);
+    const hasScentContext = currentOccasion(message) || explicit.ids.length || explicit.unknownSkus.length ||
+      Object.keys(QUERY_ALIASES).some(term => hasConcept(fold(message), term));
+    if (isBurmese(message) && !hasScentContext && recommendations.length) {
+      reply = /ဈေး|စျေး|ဘယ်လောက်ကျ/.test(message)
+        ? '10ml က ၁၅,၀၀၀ ကျပ်၊ 30ml က ၃၅,၀၀၀ ကျပ်ပါ။'
+        : 'ဘယ်လိုရနံ့မျိုး ရှာနေတာလဲဗျ။ လတ်ဆတ်တာလေး ကြိုက်လား၊ ချိုနွေးတာလေး ကြိုက်လား။';
+      recommendations = [];
+    }
     let fallback = true;
     const key = process.env.NOVA_AI_AGENT || process.env.OPENAI_API_KEY;
     const keySource = process.env.NOVA_AI_AGENT ? 'NOVA_AI_AGENT' : process.env.OPENAI_API_KEY ? 'OPENAI_API_KEY' : 'none';
@@ -227,7 +246,7 @@ export default async function handler(req, res) {
     if (!key) {
       console.warn('[scent-advisor] OpenAI fallback', { category: 'missing_key', code: 'OPENAI_KEY_MISSING', status: null, keySource });
     }
-    if (key && recommendations.length) {
+    if (key && candidates.length) {
       let status = null;
       try {
         const configuredModel = process.env.LLM_MODEL || 'gpt-5-mini';
