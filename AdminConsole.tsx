@@ -5,12 +5,13 @@ import { buildAddressLabelHtml, buildReceiptHtml } from './lib/print-templates.m
 import type { SupabaseClient } from '@supabase/supabase-js';
 import AdminMedia from './AdminMedia';
 import AdminSamples from './AdminSamples';
+import AdminCostStudio from './AdminCostStudio';
 import AdminStock from './AdminStock';
 import OrderSlip from './OrderSlip';
 import shopPricing from './data/shop-pricing.json';
 
-type Section = 'orders' | 'stock' | 'legacyStock' | 'daily' | 'discount' | 'showcase' | 'media' | 'samples';
-const sections: { id: Section; label: string }[] = [{ id: 'orders', label: 'Orders' }, { id: 'stock', label: 'Stock In / Out' }, { id: 'daily', label: 'နေ့စဉ်စာရင်း' }, { id: 'legacyStock', label: 'အဟောင်း / အရည် ml' }, { id: 'discount', label: 'Discount' }, { id: 'media', label: 'NV Profiles' }, { id: 'showcase', label: 'Live Board' }, { id: 'samples', label: 'Free Samples' }];
+type Section = 'orders' | 'stock' | 'legacyStock' | 'daily' | 'discount' | 'showcase' | 'media' | 'samples' | 'costStudio';
+const sections: { id: Section; label: string }[] = [{ id: 'orders', label: 'Orders' }, { id: 'stock', label: 'Stock In / Out' }, { id: 'daily', label: 'နေ့စဉ်စာရင်း' }, { id: 'legacyStock', label: 'အဟောင်း / အရည် ml' }, { id: 'discount', label: 'Discount' }, { id: 'media', label: 'NV Profiles' }, { id: 'showcase', label: 'Live Board' }, { id: 'samples', label: 'Free Samples' }, { id: 'costStudio', label: 'Cost Studio' }];
 
 const API_URL = (process.env.EXPO_PUBLIC_API_URL || '').replace(/\/$/, '');
 const endpoint = (path: string) => {
@@ -141,7 +142,7 @@ export default function AdminConsole({ onSignOut, authClient }: { onSignOut: () 
     {section === 'orders' ? <View style={styles.toolbar}><Text style={styles.help}>Paper size · 80 × 110 mm</Text></View> : null}
     {loading ? <Text style={styles.message}>Loading Preview data…</Text> : <ScrollView ref={contentScroll} contentContainerStyle={styles.content}>
       {error ? <Text accessibilityRole="alert" style={styles.error}>{error}</Text> : null}{notice ? <Text accessibilityLiveRegion="polite" style={styles.notice}>{notice}</Text> : null}
-      {section === 'samples' ? <AdminSamples api={api} onEditingChange={setMediaEditing} onBusyChange={setMediaBusy} /> : section === 'media' || section === 'showcase' ? <AdminMedia key={section} mode={section === 'showcase' ? 'board' : 'products'} api={api} onEditingChange={setMediaEditing} onBusyChange={setMediaBusy} /> : section === 'orders' ? <>
+      {section === 'costStudio' ? <AdminCostStudio api={api} /> : section === 'samples' ? <AdminSamples api={api} onEditingChange={setMediaEditing} onBusyChange={setMediaBusy} /> : section === 'media' || section === 'showcase' ? <AdminMedia key={section} mode={section === 'showcase' ? 'board' : 'products'} api={api} onEditingChange={setMediaEditing} onBusyChange={setMediaBusy} /> : section === 'orders' ? <>
         <View style={styles.sectionHeading}><Text style={styles.sectionTitle}>Order queue</Text><Pressable onPress={refresh}><Text style={styles.refresh}>Refresh</Text></Pressable></View>
         <PrintButton title="နေ့စဉ်စာရင်းပိတ်ကြည့်ရန်" onPress={() => navigate('daily')} />
         <Text style={styles.helpBlock}>Print slip / PDF / PNG ကိုနှိပ်ပြီး slip ကြည့်နိုင်၊ ဖိုင်သိမ်းနိုင်ပါတယ်။ iPhone မှာ Share → Thermer ဖြင့် Bluetooth printer ဆီ ပို့ပါ။</Text>
