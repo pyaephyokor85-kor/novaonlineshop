@@ -5,6 +5,12 @@ import catalog from '../../data/nova-catalog.json' with { type: 'json' };
 
 export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(204).end();
+  if (new URL(req.url || '/', 'http://localhost').searchParams.get('view') === 'cost-studio-sync') {
+    res.setHeader('Cache-Control', 'private, no-store');
+    if (process.env.VERCEL_ENV !== 'preview') return res.status(404).json({ error: 'Preview only' });
+    const result = await processAdminRequest(req, { resource: 'cost-studio-sync' });
+    return res.status(result.status).json(result.body);
+  }
   if (new URL(req.url || '/', 'http://localhost').searchParams.get('view') === 'cost-studio') {
     res.setHeader('Cache-Control', 'private, no-store');
     if (req.method !== 'GET') return res.status(405).json({ error: 'GET required' });
